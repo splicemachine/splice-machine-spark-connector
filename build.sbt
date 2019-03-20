@@ -6,6 +6,6 @@ scalaVersion := "2.12.8"
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.0" % Provided
 
-val scalatestVer = "3.0.6"
+val scalatestVer = "3.0.7"
 libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer
 libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test
