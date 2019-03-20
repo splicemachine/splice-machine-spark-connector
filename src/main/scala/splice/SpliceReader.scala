@@ -1,6 +1,6 @@
 package splice
 
-import java.util
+import java.util.{List => JList}
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.sources.v2.DataSourceOptions
@@ -10,7 +10,7 @@ import org.apache.spark.sql.types.{LongType, StructField, StructType, TimestampT
 class SpliceReader(options: DataSourceOptions) extends DataSourceReader {
   override def readSchema(): StructType = SpliceReader.SCHEMA
 
-  override def planInputPartitions(): util.List[InputPartition[InternalRow]] = ???
+  override def planInputPartitions(): JList[InputPartition[InternalRow]] = ???
 }
 
 object SpliceReader {
