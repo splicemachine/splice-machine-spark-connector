@@ -14,16 +14,19 @@ class SpliceStreamWriter(
   options: DataSourceOptions) extends StreamWriter {
 
   override def commit(epochId: Long, messages: Array[WriterCommitMessage]): Unit = {
-    println(s">>> [SpliceStreamWriter.commit] $epochId | ${messages.length}")
+    println(s">>> [SpliceStreamWriter.commit] epochId = $epochId | #messages = ${messages.length}")
   }
 
   override def abort(epochId: Long, messages: Array[WriterCommitMessage]): Unit = {
-    println(s">>> [SpliceStreamWriter.abort] $epochId | ${messages.length}")
+    println(s">>> [SpliceStreamWriter.abort] epochId = $epochId | #messages = ${messages.length}")
   }
 
   override def createWriterFactory(): DataWriterFactory[InternalRow] = {
     println(s">>> [SpliceStreamWriter.createWriterFactory]")
-    new SpliceDataWriterFactory
+    new SpliceDataWriterFactory(schema)
   }
 
+  override def onDataWriterCommit(message: WriterCommitMessage): Unit = {
+    println(s">>> SpliceStreamWriter.onDataWriterCommit($message)")
+  }
 }

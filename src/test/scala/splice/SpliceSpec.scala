@@ -27,8 +27,9 @@ class SpliceSpec extends BaseSpec {
       // FIXME Make sure that the options are passed on
       spark.conf.set("spark.datasource.splice.session.option", "session-value")
 
-      import org.apache.spark.sql.streaming.Trigger
       import java.util.UUID
+      import org.apache.spark.sql.streaming.Trigger
+      import concurrent.duration._
       val sq = spark
         .readStream
         .format("rate")
@@ -37,18 +38,20 @@ class SpliceSpec extends BaseSpec {
         .format("splice")
         .option("splice.option", "option-value")
         .option("checkpointLocation", s"target/checkpointLocation-${UUID.randomUUID()}")
-        .trigger(Trigger.Once())
+        .trigger(Trigger.ProcessingTime(1.second))
         .start()
 
-      sq.isActive should be (true)
+      sq.isActive should be(true)
 
-      sq.processAllAvailable()
+      // FIXME Let the streaming query execute twice or three times exactly
+      import concurrent.duration._
+      sq.awaitTermination(2.seconds.toMillis)
       sq.stop()
 
-      sq.isActive should be (false)
+      sq.isActive should be(false)
 
       val progress = sq.lastProgress
-      progress.sink.description should be ("splice.SpliceDataSourceV2[splice]")
+      progress.sink.description should be("splice.SpliceDataSourceV2[splice]")
     }
 
 }
