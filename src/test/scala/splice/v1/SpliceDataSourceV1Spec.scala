@@ -1,26 +1,24 @@
-package splice.v2
+package splice.v1
 
 import splice.BaseSpec
 
-class SpliceDataSourceV2Spec extends BaseSpec {
+class SpliceDataSourceV1Spec extends BaseSpec {
 
-  "Splice Machine Connector (Data Source API V2)" should "support batch reading" in
+  "Splice Machine Connector (Data Source API V1)" should "support batch reading" in
     withSparkSession { spark =>
       val q = spark
         .read
-        .format(SpliceDataSourceV2.NAME)
+        .format(SpliceDataSourceV1.NAME)
         .load
       val leaves = q.queryExecution.logical.collectLeaves()
       leaves should have length 1
 
-      import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
-      import org.apache.spark.sql.sources.DataSourceRegister
-      val source = leaves
+      import org.apache.spark.sql.execution.datasources.LogicalRelation
+      leaves
         .head
-        .asInstanceOf[DataSourceV2Relation]
-        .source
-        .asInstanceOf[DataSourceRegister]
-      source.shortName() should be(SpliceDataSourceV2.NAME)
+        .asInstanceOf[LogicalRelation]
+        .relation
+        .asInstanceOf[SpliceRelation]
     }
 
   it should "support streaming write (with extra session-scoped options)" in
@@ -39,25 +37,24 @@ class SpliceDataSourceV2Spec extends BaseSpec {
         .format("rate")
         .load
         .writeStream
-        .format(SpliceDataSourceV2.NAME)
+        .format(SpliceDataSourceV1.NAME)
         .option("splice.option", "option-value")
         .option("checkpointLocation", s"target/checkpointLocation-${UUID.randomUUID()}")
         .trigger(Trigger.ProcessingTime(1.second))
         .start()
 
-      sq.isActive should be(true)
+      sq should be('active)
 
       // FIXME Let the streaming query execute twice or three times exactly
       import concurrent.duration._
       sq.awaitTermination(2.seconds.toMillis)
       sq.stop()
 
-      sq.isActive should be(false)
+      sq should not be 'active
 
       val progress = sq.lastProgress
       val actual = progress.sink.description
-      val expected = s"splice.v2.SpliceDataSourceV2[${SpliceDataSourceV2.NAME}]"
+      val expected = s"splice.v1.SpliceSink[${SpliceDataSourceV1.NAME}]"
       actual should be(expected)
     }
-
 }
