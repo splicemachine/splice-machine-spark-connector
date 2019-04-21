@@ -1,4 +1,4 @@
-package splice
+package splice.v2
 
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.sources.v2._
@@ -36,5 +36,5 @@ class SpliceDataSourceV2 extends DataSourceV2
 }
 
 object SpliceDataSourceV2 {
-  val NAME = "splice"
+  val NAME = "spliceV2"
 }

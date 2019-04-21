@@ -1,12 +1,14 @@
-package splice
+package splice.v2
 
-class SpliceSpec extends BaseSpec {
+import splice.BaseSpec
+
+class SpliceDataSourceV2Spec extends BaseSpec {
 
   "Splice Machine Connector" should "support batch reading" in
     withSparkSession { spark =>
       val q = spark
         .read
-        .format("splice")
+        .format("spliceV2")
         .load
       val leaves = q.queryExecution.logical.collectLeaves()
       leaves should have length 1
@@ -28,14 +30,16 @@ class SpliceSpec extends BaseSpec {
       spark.conf.set("spark.datasource.splice.session.option", "session-value")
 
       import java.util.UUID
+
       import org.apache.spark.sql.streaming.Trigger
+
       import concurrent.duration._
       val sq = spark
         .readStream
         .format("rate")
         .load
         .writeStream
-        .format("splice")
+        .format("spliceV2")
         .option("splice.option", "option-value")
         .option("checkpointLocation", s"target/checkpointLocation-${UUID.randomUUID()}")
         .trigger(Trigger.ProcessingTime(1.second))
@@ -51,7 +55,7 @@ class SpliceSpec extends BaseSpec {
       sq.isActive should be(false)
 
       val progress = sq.lastProgress
-      progress.sink.description should be("splice.SpliceDataSourceV2[splice]")
+      progress.sink.description should be("splice.v2.SpliceDataSourceV2[spliceV2]")
     }
 
 }

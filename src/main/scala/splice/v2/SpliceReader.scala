@@ -1,4 +1,4 @@
-package splice
+package splice.v2
 
 import java.util.{List => JList}
 
