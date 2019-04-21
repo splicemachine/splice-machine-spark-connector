@@ -18,6 +18,8 @@ Consult [Issues](https://github.com/jaceklaskowski/splice-machine-spark-connecto
 
 1. Install [sbt](https://www.scala-sbt.org/) build tool
 
+1. Install [Apache Spark](https://spark.apache.org/)
+
 ## Building
 
 You have to build the data source yourself before first use using `sbt package` command.
@@ -25,7 +27,7 @@ You have to build the data source yourself before first use using `sbt package` 
 ```
 $ sbt package
 ...
-[info] Packaging .../target/scala-2.12/splice-machine-spark-connector_2.12-0.1.jar ...
+[info] Packaging .../target/scala-2.11/splice-machine-spark-connector_2.11-0.1.jar ...
 [info] Done packaging.
 ```
 
@@ -48,10 +50,13 @@ There are a couple of ways to use the connector:
 The below session uses `spark-shell` for demonstration purposes.
 
 ```
-$ spark-shell --jars target/scala-2.12/splice-machine-spark-connector_2.12-0.1.jar
+$ spark-shell --jars target/scala-2.11/splice-machine-spark-connector_2.11-0.1.jar
 ...
+scala> spark.version
+res0: String = 2.4.1
+
 scala> spark.read.format("spliceV1").load.show
-+---+--------------+
++---+--------------+                                                            
 | id|          name|
 +---+--------------+
 |  0|splice machine|
