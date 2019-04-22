@@ -7,7 +7,7 @@ import org.apache.spark.sql.types.StructType
 
 class SpliceRelation(
     override val schema: StructType,
-    parameters: Map[String, String])(@transient val sparkSession: SparkSession)
+    opts: SpliceOptions)(@transient val sparkSession: SparkSession)
   extends BaseRelation
   with PrunedFilteredScan
   with InsertableRelation {

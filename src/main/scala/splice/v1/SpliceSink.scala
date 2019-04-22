@@ -6,7 +6,7 @@ import org.apache.spark.sql.streaming.OutputMode
 
 class SpliceSink(
   sqlContext: SQLContext,
-  parameters: Map[String, String],
+  opts: SpliceOptions,
   partitionColumns: Seq[String],
   outputMode: OutputMode) extends Sink {
   override def addBatch(batchId: Long, data: DataFrame): Unit = {
