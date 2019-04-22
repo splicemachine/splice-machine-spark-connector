@@ -1,12 +1,12 @@
 package splice.v2
 
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.sources.v2.writer.{DataWriter, WriterCommitMessage}
 import org.apache.spark.sql.types.StructType
 
-class SpliceDataWriter(schema: StructType) extends DataWriter[InternalRow] {
-  override def write(record: InternalRow): Unit = {
-    println(s">>> SpliceDataWriter.write(${record.toSeq(schema)})")
+class SpliceDataWriter(schema: StructType) extends DataWriter[Row] {
+  override def write(record: Row): Unit = {
+    println(s">>> SpliceDataWriter.write(${record.toSeq})")
   }
 
   override def commit(): WriterCommitMessage = {

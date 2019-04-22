@@ -16,5 +16,4 @@ class BaseSpec extends FlatSpec
     try testCode(spark)
     finally spark.close
   }
-
 }

@@ -36,6 +36,8 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
       schema: StructType): BaseRelation = {
     val opts = new SpliceOptions(parameters)
     opts.assertRequiredOptionsDefined
+    import com.splicemachine.spark.splicemachine.SplicemachineContext
+    val spliceContext = new SplicemachineContext(opts.url)
     new SpliceRelation(schema, opts)(sqlContext.sparkSession)
   }
 

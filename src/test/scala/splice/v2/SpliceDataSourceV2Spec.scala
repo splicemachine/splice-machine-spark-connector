@@ -1,7 +1,9 @@
 package splice.v2
 
 import splice.BaseSpec
+import org.scalatest.Ignore
 
+@Ignore
 class SpliceDataSourceV2Spec extends BaseSpec {
 
   "Splice Machine Connector (Data Source API V2)" should "support batch reading" in
@@ -18,7 +20,7 @@ class SpliceDataSourceV2Spec extends BaseSpec {
       val source = leaves
         .head
         .asInstanceOf[DataSourceV2Relation]
-        .source
+        .reader
         .asInstanceOf[DataSourceRegister]
       source.shortName() should be(SpliceDataSourceV2.NAME)
     }
