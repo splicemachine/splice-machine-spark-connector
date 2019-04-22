@@ -62,3 +62,21 @@ scala> spark.read.format("spliceV1").load.show
 |  0|splice machine|
 +---+--------------+
 ```
+
+## Testing
+
+Use `sbt test` (or `sbt testOnly`) to execute integration tests.
+
+**NOTE**: Don't forget to start Splice Machine before the tests, e.g. `./start-splice-cluster`.
+
+The following command is what is currently under *heavy development*:
+
+```
+$ sbt 'testOnly *SpliceDataSourceV1BatchSpec'
+...
+INFO SpliceSpark: Splice Client in SpliceSpark true
+...
+```
+
+**NOTE**: After you're done with tests, stop Splice Machine using `./start-splice-cluster -k`.
+

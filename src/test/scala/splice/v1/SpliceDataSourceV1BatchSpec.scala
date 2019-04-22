@@ -15,7 +15,9 @@ class SpliceDataSourceV1BatchSpec extends BaseSpec {
         .read
         .format(SpliceDataSourceV1.NAME)
         .schema(schema)
-        .option(SpliceOptions.JDBC_URL, "jdbc:splice://<jdbcUrlString>")
+        .option(SpliceOptions.JDBC_URL, "jdbc:splice://localhost:1527/splicedb")
+        .option(SpliceOptions.USER, "FIXME_user")
+        .option(SpliceOptions.PASSWORD, "FIXME_password")
         .load
       val leaves = q.queryExecution.logical.collectLeaves()
       leaves should have length 1

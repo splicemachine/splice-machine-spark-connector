@@ -18,6 +18,8 @@ class SpliceOptions(val parameters: Map[String, String]) {
 
 object SpliceOptions {
   val JDBC_URL = "url"
+  val USER = "user"
+  val PASSWORD = "password"
   val JDBC_INTERNAL_QUERIES = "internal"
   val JDBC_TEMP_DIRECTORY = "tmp"
 }
