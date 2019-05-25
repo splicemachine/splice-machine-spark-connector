@@ -4,27 +4,38 @@ version := "0.1"
 
 scalaVersion := "2.11.12"
 
-// FIXME Spark 2.3.2 seems the latest supported by splice machine
-libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.3.2" % Provided
-dependencyOverrides += "org.apache.spark" %% "spark-sql" % "2.3.2"
+val spliceVersion = "2.8.0.1919-SNAPSHOT"
+val envClassifier = "cdh5.14.0"
 
-val scalatestVer = "3.0.7"
-libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer force()
-libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test force()
-// FIXME Somehow dependencies include scalatest 2.2.6 in Runtime scope!
-dependencyOverrides += "org.scalatest" %% "scalatest" % scalatestVer
+val hbaseVersion = s"1.2.0-$envClassifier"
+val hadoopVersion = s"2.6.0-$envClassifier"
+
+// FIXME hbase_sql should actually be dependency of splice_spark
+//  ClassNotFoundException: com.splicemachine.derby.impl.SpliceSpark
+
+// FIXME hbase_storage should actually be dependency of splice_spark
+// java.lang.NoClassDefFoundError: com/splicemachine/access/HConfiguration
+// https://stackoverflow.com/a/46763742/1305344
+
+libraryDependencies ++= Seq(
+  "splice_spark",
+  "hbase_sql",
+  "hbase_storage",
+  "hbase_pipeline"
+).map(spliceDep)
+
+val sparkVersion = "2.2.0.cloudera2"
+libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion
+libraryDependencies += "org.apache.hbase" % "hbase-server" % hbaseVersion
 
 resolvers +=
   "splicemachine-public" at "http://repository.splicemachine.com/nexus/content/groups/public"
 resolvers +=
-  "mapr-public" at "http://repository.mapr.com/maven/"
-
-// FIXME classifiers do not work with coursier
-// see https://github.com/sbt/sbt/issues/285
-val envClassifier = "mapr6.1.0"
-val hbaseVersion = "1.1.8-mapr-1901"
-val spliceVersion = "latest.version"
-libraryDependencies += "com.splicemachine" % "splice_spark" % spliceVersion classifier envClassifier
+  "cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
+// For development only / local Splice SNAPSHOTs
+resolvers += Resolver.mavenLocal
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
 libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.8" force()
@@ -32,39 +43,20 @@ libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" 
 // FIXME The following dependencies fail in sbt due to envClassifier property not being resolved
 // The pattern is to exclude them first and add them explicitly right after
 
-// FIXME hbase_storage should actually be dependency of splice_spark
-// java.lang.NoClassDefFoundError: com/splicemachine/access/HConfiguration
-// https://stackoverflow.com/a/46763742/1305344
+updateOptions := updateOptions.value.withLatestSnapshots(false)
+
 lazy val mavenProps = settingKey[Unit]("workaround for Maven properties")
 mavenProps := {
   sys.props("envClassifier") = envClassifier
   sys.props("hbase.version") = hbaseVersion
+  sys.props("hadoop.version") = hadoopVersion
   ()
 }
 
-libraryDependencies +=
-  "com.splicemachine" % "hbase_storage" % spliceVersion classifier envClassifier force()
-dependencyOverrides += "com.splicemachine" % "hbase_storage" % spliceVersion classifier envClassifier
+val scalatestVer = "3.0.7"
+libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer
+libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test
 
-// FIXME hbase_sql should actually be dependency of splice_spark
-//  ClassNotFoundException: com.splicemachine.derby.impl.SpliceSpark
-libraryDependencies +=
-  "com.splicemachine" % "hbase_sql" % spliceVersion classifier envClassifier
-
-// default-jar execution in scala_util/pom.xml changes the classifier
-// And build.sbt sets envClassifier that is different from expected value
-// FIXME How to include scala_util?! The following does not work
-excludeDependencies ++= Seq(
-  ExclusionRule("com.splicemachine", "scala_util")
-)
-
-val sparkVersionMapr610 = s"$envClassifier-2.3.2.0-mapr-1901"
-libraryDependencies +=
-  "com.splicemachine" % "scala_util" % spliceVersion classifier sparkVersionMapr610 force()
-dependencyOverrides += "com.splicemachine" % "scala_util" % spliceVersion classifier sparkVersionMapr610
-
-libraryDependencies +=
-  "com.splicemachine" % "hbase_pipeline" % spliceVersion classifier envClassifier
-
-libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.7.3" force()
-libraryDependencies += "org.apache.hbase" % "hbase-common" % hbaseVersion
+def spliceDep(name: String): ModuleID = {
+  "com.splicemachine" % name % spliceVersion classifier envClassifier withSources()
+}
