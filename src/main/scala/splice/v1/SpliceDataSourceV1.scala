@@ -1,15 +1,16 @@
 package splice.v1
 
-import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Sink
-import org.apache.spark.sql.sources.{BaseRelation, DataSourceRegister, RelationProvider, SchemaRelationProvider, StreamSinkProvider}
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode}
 
 class SpliceDataSourceV1 extends SchemaRelationProvider
   with RelationProvider
   with DataSourceRegister
-  with StreamSinkProvider {
+  with StreamSinkProvider
+  with CreatableRelationProvider {
 
   override def shortName(): String = SpliceDataSourceV1.NAME
 
@@ -31,24 +32,33 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
     * For Spark SQL with user-defined schema
     */
   override def createRelation(
-      sqlContext: SQLContext,
-      parameters: Map[String, String],
-      schema: StructType): BaseRelation = {
+    sqlContext: SQLContext,
+    parameters: Map[String, String],
+    schema: StructType): BaseRelation = {
     val opts = new SpliceOptions(parameters)
     opts.assertRequiredOptionsDefined
-    import com.splicemachine.spark.splicemachine.SplicemachineContext
-    val spliceContext = new SplicemachineContext(opts.url)
     new SpliceRelation(schema, opts)(sqlContext.sparkSession)
+  }
+
+  override def createRelation(
+    sqlContext: SQLContext,
+    mode: SaveMode,
+    parameters: Map[String, String],
+    data: DataFrame): BaseRelation = {
+    val spliceTable = createRelation(sqlContext, parameters, data.schema)
+      .asInstanceOf[SpliceRelation]
+    spliceTable.insert(data, overwrite = SaveMode.Overwrite == mode)
+    spliceTable
   }
 
   /**
     * For Spark Structured Streaming
     */
   override def createSink(
-      sqlContext: SQLContext,
-      parameters: Map[String, String],
-      partitionColumns: Seq[String],
-      outputMode: OutputMode): Sink = {
+    sqlContext: SQLContext,
+    parameters: Map[String, String],
+    partitionColumns: Seq[String],
+    outputMode: OutputMode): Sink = {
     val opts = new SpliceOptions(parameters)
     new SpliceSink(sqlContext, opts, partitionColumns, outputMode)
   }

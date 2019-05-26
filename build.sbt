@@ -22,10 +22,15 @@ libraryDependencies ++= Seq(
   "hbase_sql",
   "hbase_storage",
   "hbase_pipeline"
-).map(spliceDep)
+).map(spliceDep(_))
 
 val sparkVersion = "2.2.0.cloudera2"
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion
+
+val scalaUtilClassifier = Def.setting {
+  s"$envClassifier-${sparkVersion}_${scalaBinaryVersion.value}"
+}
+libraryDependencies += spliceDep("scala_util", scalaUtilClassifier.value)
 
 libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion
 libraryDependencies += "org.apache.hbase" % "hbase-server" % hbaseVersion
@@ -57,6 +62,6 @@ val scalatestVer = "3.0.7"
 libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer
 libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test
 
-def spliceDep(name: String): ModuleID = {
-  "com.splicemachine" % name % spliceVersion classifier envClassifier withSources()
+def spliceDep(name: String, classifier: String = envClassifier): ModuleID = {
+  "com.splicemachine" % name % spliceVersion classifier classifier withSources()
 }
