@@ -46,7 +46,7 @@ resolvers +=
 resolvers += Resolver.mavenLocal
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
-libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.8" force()
+libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.9" force()
 
 // FIXME The following dependencies fail in sbt due to envClassifier property not being resolved
 // The pattern is to exclude them first and add them explicitly right after
