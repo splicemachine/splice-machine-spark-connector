@@ -1,9 +1,10 @@
 package splice.v1
 
+import com.splicemachine.spark.splicemachine.SplicemachineContext
 import org.apache.spark.sql.execution.streaming.Sink
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode
-import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode}
 
 class SpliceDataSourceV1 extends SchemaRelationProvider
@@ -18,13 +19,11 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
     * For Spark SQL when no schema given explicitly
     */
   override def createRelation(
-    sqlContext: SQLContext,
-    parameters: Map[String, String]): BaseRelation = {
-    // FIXME Schema of the table we read from
-    val schema = StructType(Seq(
-      StructField("id", LongType),
-      StructField("name", StringType)
-    ))
+      sqlContext: SQLContext,
+      parameters: Map[String, String]): BaseRelation = {
+    val opts = new SpliceOptions(parameters)
+    val spliceCtx = new SplicemachineContext(opts.url)
+    val schema = spliceCtx.getSchema(opts.table)
     createRelation(sqlContext, parameters, schema)
   }
 
@@ -32,19 +31,18 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
     * For Spark SQL with user-defined schema
     */
   override def createRelation(
-    sqlContext: SQLContext,
-    parameters: Map[String, String],
-    schema: StructType): BaseRelation = {
+      sqlContext: SQLContext,
+      parameters: Map[String, String],
+      schema: StructType): BaseRelation = {
     val opts = new SpliceOptions(parameters)
-    opts.assertRequiredOptionsDefined
     new SpliceRelation(schema, opts)(sqlContext.sparkSession)
   }
 
   override def createRelation(
-    sqlContext: SQLContext,
-    mode: SaveMode,
-    parameters: Map[String, String],
-    data: DataFrame): BaseRelation = {
+      sqlContext: SQLContext,
+      mode: SaveMode,
+      parameters: Map[String, String],
+      data: DataFrame): BaseRelation = {
     val spliceTable = createRelation(sqlContext, parameters, data.schema)
       .asInstanceOf[SpliceRelation]
     spliceTable.insert(data, overwrite = SaveMode.Overwrite == mode)
@@ -55,10 +53,10 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
     * For Spark Structured Streaming
     */
   override def createSink(
-    sqlContext: SQLContext,
-    parameters: Map[String, String],
-    partitionColumns: Seq[String],
-    outputMode: OutputMode): Sink = {
+      sqlContext: SQLContext,
+      parameters: Map[String, String],
+      partitionColumns: Seq[String],
+      outputMode: OutputMode): Sink = {
     val opts = new SpliceOptions(parameters)
     new SpliceSink(sqlContext, opts, partitionColumns, outputMode)
   }

@@ -1,13 +1,12 @@
 package splice
 
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{FlatSpec, Matchers}
-
-import org.scalatest.Ignore
+import org.scalatest.{BeforeAndAfter, FlatSpec, Ignore, Matchers}
 
 @Ignore
 class BaseSpec extends FlatSpec
-  with Matchers {
+  with Matchers
+  with BeforeAndAfter {
 
   def withSparkSession(testCode: SparkSession => Any): Unit = {
     val spark = SparkSession

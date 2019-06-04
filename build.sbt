@@ -64,6 +64,7 @@ mavenProps := {
 val scalatestVer = "3.0.7"
 libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer
 libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test
+parallelExecution in Test := false
 
 def spliceDep(name: String, classifier: String = envClassifier): ModuleID = {
   "com.splicemachine" % name % spliceVersion classifier classifier withSources()

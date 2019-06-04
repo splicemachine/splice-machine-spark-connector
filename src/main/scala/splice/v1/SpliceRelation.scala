@@ -14,8 +14,9 @@ class SpliceRelation(
     with InsertableRelation {
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
-    val spliceContext = new SplicemachineContext(opts.url)
-    spliceContext.rdd(opts.table)
+    val spliceCtx = new SplicemachineContext(opts.url)
+    // FIXME columnProjection is required
+    spliceCtx.rdd(opts.table, requiredColumns)
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {

@@ -4,6 +4,8 @@ class SpliceOptions(val parameters: Map[String, String]) {
   def url: String = parameters(SpliceOptions.JDBC_URL)
   def table: String = parameters(SpliceOptions.TABLE)
 
+  assertRequiredOptionsDefined
+
   /**
     * Asserts that the required parameters (options) were defined:
     * - [[SpliceOptions.JDBC_URL]]
