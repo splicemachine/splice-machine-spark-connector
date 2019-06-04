@@ -19,8 +19,16 @@ class SpliceRelation(
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
-    val spliceContext = new SplicemachineContext(opts.url)
-    spliceContext.insert(data, opts.table)
+    val spliceCtx = new SplicemachineContext(opts.url)
+    val tableName = opts.table
+    val isTableAvailable = spliceCtx.tableExists(tableName)
+    if (!isTableAvailable) {
+      spliceCtx.createTable(tableName, data.schema, keys = Seq.empty, createTableOptions = "UNUSED")
+    } else if (isTableAvailable && overwrite) {
+      spliceCtx.dropTable(tableName)
+      spliceCtx.createTable(tableName, data.schema, keys = Seq.empty, createTableOptions = "UNUSED")
+    }
+    spliceCtx.insert(data, tableName)
   }
 
   override def sqlContext: SQLContext = sparkSession.sqlContext
