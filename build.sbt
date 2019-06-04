@@ -33,6 +33,9 @@ val scalaUtilClassifier = Def.setting {
 libraryDependencies += spliceDep("scala_util", scalaUtilClassifier.value)
 
 libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion
+// Required to ensure proper dependency
+// (otherwise cdh5.12.0 version was resolved and used)
+libraryDependencies += "org.apache.hadoop" % "hadoop-mapreduce-client-core" % hadoopVersion
 libraryDependencies += "org.apache.hbase" % "hbase-server" % hbaseVersion
 
 resolvers +=

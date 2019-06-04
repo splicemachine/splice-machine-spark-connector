@@ -33,7 +33,8 @@ class SpliceSpec extends FlatSpec
     val testName = this.getClass.getSimpleName
 
     val tableName = testName
-    val data = Seq((0L, testName)).toDF("id", "test_name")
+    // FIXME Splice supports dataframes with uppercase column names only
+    val data = Seq((0L, testName)).toDF("ID", "TEST_NAME")
 
     if (spliceCtx.tableExists(tableName)) {
       spliceCtx.dropTable(tableName)
