@@ -43,9 +43,16 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
       mode: SaveMode,
       parameters: Map[String, String],
       data: DataFrame): BaseRelation = {
-    val spliceTable = createRelation(sqlContext, parameters, data.schema)
+    println(">>> createRelation")
+    // FIXME Splice supports dataframes with uppercase column names only
+    import org.apache.spark.sql.functions.col
+    val columnNamesUpperCase = data.columns.map(_.toUpperCase).map(col).toSeq
+    println(s">>> column names: $columnNamesUpperCase")
+    val dataWithColumnNamesAllUpper = data.select(columnNamesUpperCase: _*)
+
+    val spliceTable = createRelation(sqlContext, parameters, dataWithColumnNamesAllUpper.schema)
       .asInstanceOf[SpliceRelation]
-    spliceTable.insert(data, overwrite = SaveMode.Overwrite == mode)
+    spliceTable.insert(dataWithColumnNamesAllUpper, overwrite = SaveMode.Overwrite == mode)
     spliceTable
   }
 

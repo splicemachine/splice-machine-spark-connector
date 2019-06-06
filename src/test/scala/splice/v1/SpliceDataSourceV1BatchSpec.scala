@@ -2,27 +2,10 @@ package splice.v1
 
 import java.util.UUID
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 import splice.BaseSpec
 
 class SpliceDataSourceV1BatchSpec extends BaseSpec {
-
-  val tableName = this.getClass.getSimpleName
-  val user = "splice"
-  val password = "admin"
-  val url = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
-
-  var spark: SparkSession = _
-
-  before {
-    spark = SparkSession
-      .builder
-      .master("local[*]")
-      .appName(tableName)
-      .config("spark.ui.enabled", false)
-      .getOrCreate
-  }
 
   "Splice Machine Connector (Data Source API V1 / Batch Mode)" should "support batch reading with explicit schema" in {
     val schema = StructType(Seq(

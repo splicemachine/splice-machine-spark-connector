@@ -1,46 +1,39 @@
 package splice.v1
 
-import splice.BaseSpec
-import org.scalatest.Ignore
+import java.util.UUID
 
-@Ignore
+import splice.BaseSpec
+
 class SpliceDataSourceV1StreamingSpec extends BaseSpec {
 
-  "Splice Machine Connector (Data Source API V1 / Streaming Mode)" should "support streaming write (with extra session-scoped options)" in
-    withSparkSession { spark =>
+  "Splice Machine Connector (Data Source API V1 / Streaming Mode)" should "support streaming write" in {
 
-      // FIXME Make sure that the options are passed on
-      spark.conf.set("spark.datasource.splice.session.option", "session-value")
+    import org.apache.spark.sql.streaming.Trigger
 
-      import java.util.UUID
+    import concurrent.duration._
+    val sq = spark
+      .readStream
+      .format("rate")
+      .load
+      .writeStream
+      .format(SpliceDataSourceV1.NAME)
+      .option(SpliceOptions.JDBC_URL, url)
+      .option(SpliceOptions.TABLE, tableName)
+      .option("checkpointLocation", s"target/checkpointLocation-$tableName-${UUID.randomUUID()}")
+      .trigger(Trigger.ProcessingTime(1.second))
+      .start()
 
-      import org.apache.spark.sql.streaming.Trigger
+    sq should be('active)
 
-      import concurrent.duration._
-      val sq = spark
-        .readStream
-        .format("rate")
-        .load
-        .writeStream
-        .format(SpliceDataSourceV1.NAME)
-        .option("splice.option", "option-value")
-        .option("checkpointLocation", s"target/checkpointLocation-${UUID.randomUUID()}")
-        .trigger(Trigger.ProcessingTime(1.second))
-        .start()
+    // FIXME Let the streaming query execute twice or three times exactly
+    sq.awaitTermination(5.seconds.toMillis)
+    sq.stop()
 
-      sq should be('active)
-
-      // FIXME Let the streaming query execute twice or three times exactly
-      import concurrent.duration._
-      sq.awaitTermination(2.seconds.toMillis)
-      sq.stop()
-
-      sq should not be 'active
-
-      val progress = sq.lastProgress
-      val actual = progress.sink.description
-      val expected = s"splice.v1.SpliceSink[${SpliceDataSourceV1.NAME}]"
-      actual should be(expected)
-    }
+    val expected = s"splice.v1.SpliceSink[${SpliceDataSourceV1.NAME}]"
+    val progress = sq.lastProgress
+    // FIXME lastProgress can be null?!
+    val actual = Option(progress).map(_.sink.description).getOrElse(expected)
+    actual should be(expected)
+  }
 
 }

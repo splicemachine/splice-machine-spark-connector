@@ -65,6 +65,8 @@ scala> spark.read.format("spliceV1").load.show
 
 Use `sbt test` (or `sbt testOnly`) to execute the integration tests.
 
+**NOTE** For some reasons testing in IntelliJ IDEA may or may not always work. Use `sbt test` for reliable reproducible tests.
+
 **NOTE**: Don't forget to start Splice Machine before the tests, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
 ```
@@ -95,22 +97,19 @@ $ sbt test
 [info] All tests passed.
 ```
 
-The following command is what is currently under *heavy development*:
+Use `./sqlshell.sh` and `show tables in splice;` (perhaps with `select`) to check out the test results.
 
 ```
-$ sbt clean 'testOnly *SpliceDataSourceV1BatchSpec'
+$ ./sqlshell.sh
 ...
-INFO SpliceSpark: Splice Client in SpliceSpark true
-...
-[info] SpliceDataSourceV1BatchSpec:
-[info] Splice Machine Connector (Data Source API V1 / Batch Mode)
-[info] - should support batch reading with explicit schema
-[info] - should throw an IllegalStateException when required options (e.g. url) are not defined
-[info] Run completed in 6 seconds, 813 milliseconds.
-[info] Total number of tests run: 2
-[info] Suites: completed 1, aborted 0
-[info] Tests: succeeded 2, failed 0, canceled 0, ignored 0, pending 0
-[info] All tests passed.
+splice> show tables in splice;
+TABLE_SCHEM         |TABLE_NAME                                        |CONGLOM_ID|REMARKS
+-------------------------------------------------------------------------------------------------------
+SPLICE              |SPLICEDATASOURCEV1BATCHSPEC                       |1664      |
+SPLICE              |SPLICEDATASOURCEV1STREAMINGSPEC                   |1616      |
+SPLICE              |SPLICESPEC                                        |1648      |
+
+3 rows selected
 ```
 
 **NOTE**: After you're done with tests, stop Splice Machine using `./start-splice-cluster -k`.
