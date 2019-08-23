@@ -1,14 +1,14 @@
 # Splice Machine Connector for Apache Spark™
 
-**Splice Machine Connector for Apache Spark™** is a library to allow Apache Spark (namely Spark SQL and Spark Structured Streaming) to work with data in Splice Machine.
+**Splice Machine Connector for Apache Spark™** is an [Apache Spark™](https://spark.apache.org/) connector to work with data in [Splice Machine](https://www.splicemachine.com/).
 
-The connector supports the following Data Source contracts in Spark SQL:
+The connector supports batch and streaming queries using the following Data Source contracts in [Spark SQL](https://spark.apache.org/docs/latest/sql-programming-guide.html) and [Spark Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html):
 
 1. `spliceV1` format for Data Source V1 API
 
 ## Status
 
-This library is currently work-in-progress and is likely to get backwards-incompatible updates.
+This connector is currently work-in-progress and is likely to get backwards-incompatible updates.
 
 Consult [Issues](https://github.com/jaceklaskowski/splice-machine-spark-connector/issues) to know the missing features.
 
@@ -17,6 +17,8 @@ Consult [Issues](https://github.com/jaceklaskowski/splice-machine-spark-connecto
 1. Install [sbt](https://www.scala-sbt.org/) build tool
 
 1. Install [Apache Spark](https://spark.apache.org/)
+
+1. Install [Splice Machine](https://www.splicemachine.com/product/)
 
 ## Building
 
@@ -29,37 +31,21 @@ $ sbt package
 [info] Done packaging.
 ```
 
-Once done, the jar file is the connector.
+Once done, the jar file (`target/scala-2.11/splice-machine-spark-connector_2.11-0.1.jar` above) is the connector.
 
 Optionally, you could `sbt publishLocal` to publish the connector to the local repository, i.e. `~/.ivy2/local`.
 
 ## Running
 
-There are a couple of ways to use the connector:
+There are a couple of ways to use the connector in your Spark application:
 
-1. Use `spark-submit --jars [connector-jar-file]` 
+1. **(recommended)** Define it as a project dependency and `sbt assembly` to create an uber-jar with the classes of the project and the connector
 
-1. If you `sbt publishLocal` you could use `spark-submit --packages` command-line option
+1. Use `spark-submit --packages` command-line option (after `sbt publishLocal`)
 
-1. Define it as a project dependency and `sbt assemble` to create an uber-jar with the classes of the project and the connector
+1. Use `spark-submit --jars [connector-jar-file] [your-app]`
 
-**CAUTION**: The versions of Scala that were used to build the connector and Apache Spark (e.g. `2.11`, `2.12`) have to match.
-
-The below session uses `spark-shell` for demonstration purposes.
-
-```
-$ spark-shell --jars target/scala-2.11/splice-machine-spark-connector_2.11-0.1.jar
-...
-scala> spark.version
-res0: String = 2.4.1
-
-scala> spark.read.format("spliceV1").load.show
-+---+--------------+                                                            
-| id|          name|
-+---+--------------+
-|  0|splice machine|
-+---+--------------+
-```
+**CAUTION**: The versions of Scala that were used to build the connector and Apache Spark have to match (e.g. `2.11`, `2.12`).
 
 ## Testing
 
@@ -67,17 +53,12 @@ Use `sbt test` (or `sbt testOnly`) to execute the integration tests.
 
 **NOTE** For some reasons testing in IntelliJ IDEA may or may not always work. Use `sbt test` for reliable reproducible tests.
 
-**NOTE**: Don't forget to start Splice Machine before the tests, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
+**NOTE**: Start Splice Machine first, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
 ```
 $ cd $SPLICE_HOME
 
-$ ./start-splice-cluster
-...
-[INFO] ------------------------------------------------------------------------
-[INFO] BUILD SUCCESS
-[INFO] ------------------------------------------------------------------------
-...
+$ ./start-splice-cluster -p cdh5.14.0 -bl
 Running Splice insecure,cdh5.14.0 master and 2 regionservers with CHAOS = false in:
    $SPLICE_HOME/platform_it
 Starting ZooKeeper. Log file is $SPLICE_HOME/platform_it/zoo.log
@@ -90,27 +71,65 @@ Starting Region Server $SPLICE_HOME/platform_it/spliceRegionSvr2.log
 
 $ sbt test
 ...
-[info] Run completed in 4 seconds, 415 milliseconds.
-[info] Total number of tests run: 3
+[info] Run completed in 25 seconds, 749 milliseconds.
+[info] Total number of tests run: 8
 [info] Suites: completed 4, aborted 0
-[info] Tests: succeeded 3, failed 0, canceled 0, ignored 1, pending 0
+[info] Tests: succeeded 8, failed 0, canceled 0, ignored 0, pending 0
 [info] All tests passed.
+[success] Total time: 39 s, completed Aug 23, 2019 10:15:23 AM
 ```
 
-Use `./sqlshell.sh` and `show tables in splice;` (perhaps with `select`) to check out the test results.
+Use `./sqlshell.sh` to execute queries and verify the test results.
 
 ```
 $ ./sqlshell.sh
 ...
+SPLICE* - 	jdbc:splice://localhost:1527/splicedb
+* = current connection
+...
 splice> show tables in splice;
 TABLE_SCHEM         |TABLE_NAME                                        |CONGLOM_ID|REMARKS
 -------------------------------------------------------------------------------------------------------
-SPLICE              |SPLICEDATASOURCEV1BATCHSPEC                       |1664      |
-SPLICE              |SPLICEDATASOURCEV1STREAMINGSPEC                   |1616      |
-SPLICE              |SPLICESPEC                                        |1648      |
+SPLICE              |SPLICEDATASOURCEV1BATCHSPEC                       |1632      |
+SPLICE              |SPLICEDATASOURCEV1STREAMINGSPEC                   |1584      |
+SPLICE              |SPLICESPEC                                        |1616      |
 
 3 rows selected
+
+splice> select * from SPLICESPEC;
+ID                  |TEST_NAME
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+0                   |SpliceSpec
+
+1 row selected
 ```
 
-**NOTE**: After you're done with tests, stop Splice Machine using `./start-splice-cluster -k`.
+After you're done with tests, you can stop Splice Machine using `./start-splice-cluster -k`.
 
+## spark-shell
+
+**NOTE** The following **does not work** yet and is tracked as the issue [Using the connector in spark-shell](https://github.com/jaceklaskowski/splice-machine-spark-connector/issues/6).
+
+The below session uses `spark-shell` for demonstration purposes.
+
+**NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
+
+```
+$ spark-shell --jars target/scala-2.11/splice-machine-spark-connector_2.11-0.1.jar
+...
+scala> spark.version
+res0: String = 2.4.3
+
+val user = "splice"
+val password = "admin"
+val url = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
+val table = "t1"
+val t1 = spark.read.format("spliceV1").option("url", url).option("table", table).load
+
+scala> t1.show
++---+--------------+
+| id|          name|
++---+--------------+
+|  0|splice machine|
++---+--------------+
+```
