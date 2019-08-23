@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion := "2.11.12"
 
-val spliceVersion = "2.8.0.1919-SNAPSHOT"
+val spliceVersion = "2.8.0.1926"
 val envClassifier = "cdh5.14.0"
 
 val hbaseVersion = s"1.2.0-$envClassifier"
@@ -25,7 +25,7 @@ libraryDependencies ++= Seq(
 ).map(spliceDep(_))
 
 val sparkVersion = "2.2.0.cloudera2"
-libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion
+libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
 
 val scalaUtilClassifier = Def.setting {
   s"$envClassifier-${sparkVersion}_${scalaBinaryVersion.value}"
@@ -48,9 +48,6 @@ resolvers += Resolver.mavenLocal
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
 libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.9" force()
 
-// FIXME The following dependencies fail in sbt due to envClassifier property not being resolved
-// The pattern is to exclude them first and add them explicitly right after
-
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 
 lazy val mavenProps = settingKey[Unit]("workaround for Maven properties")
@@ -61,7 +58,7 @@ mavenProps := {
   ()
 }
 
-val scalatestVer = "3.0.7"
+val scalatestVer = "3.0.8"
 libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer
 libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test
 parallelExecution in Test := false
