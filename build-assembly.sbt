@@ -25,6 +25,7 @@ assemblyMergeStrategy in assembly := {
     oldStrategy(x)
 }
 
+// FIXME There has to be a better way to exclude all the jars (!)
 assemblyExcludedJars in assembly := {
   val excludedDeps = Set(
     // Conflicts with splice_aws-2.8.0.1926-shade.jar
@@ -79,10 +80,70 @@ assemblyExcludedJars in assembly := {
     // Included in / Conflicts with
     // javax.inject-2.4.0-b34.jar from Glassfish
     "javax.inject-1.jar",
+    // FIXME It is assumed to exist earlier. Make sure nothing got broken
+    // Have to be excluded to let shading in sbt-assembly work
+    "jython-standalone-2.5.3.jar",
+    "netty-3.10.6.Final.jar",
+    // Exclude Spark jars
+    "spark-launcher_2.11-2.2.0.cloudera2.jar",
+    "spark-yarn_2.11-2.1.0.jar",
+    "spark-network-common_2.11-2.2.0.cloudera2.jar",
+    "spark-network-shuffle_2.11-2.2.0.cloudera2.jar",
+    "spark-unsafe_2.11-2.2.0.cloudera2.jar",
+    "spark-tags_2.11-2.2.0.cloudera2.jar",
+    "spark-core_2.11-2.2.0.cloudera2.jar",
+    // FIXME Should spark-avro be excluded as well?
+    "spark-avro_2.11-4.0.0.jar",
+    // Hadoop
+    "hadoop-mapreduce-client-jobclient-2.6.0-cdh5.12.0.jar",
+    "hadoop-aws-2.6.0-cdh5.12.0.jar",
+    "hadoop-yarn-server-common-2.6.0-cdh5.12.0.jar",
+    "hadoop-hdfs-2.6.0-cdh5.14.0.jar",
+    "hadoop-hdfs-2.6.0-cdh5.14.0-tests.jar",
+    "hadoop-core-2.6.0-mr1-cdh5.14.0.jar",
+    "hadoop-client-2.6.0-cdh5.12.0.jar",
+    "hadoop-mapreduce-client-app-2.6.0-cdh5.12.0.jar",
+    "hadoop-mapreduce-client-common-2.6.0-cdh5.12.0.jar",
+    "hadoop-auth-2.6.0-cdh5.14.0.jar",
+    "hadoop-mapreduce-client-shuffle-2.6.0-cdh5.12.0.jar",
+    "hadoop-yarn-common-2.6.0-cdh5.14.0.jar",
+    "hadoop-yarn-server-nodemanager-2.6.0-cdh5.12.0.jar",
+    "hadoop-mapreduce-client-core-2.6.0-cdh5.14.0.jar",
+    "hadoop-yarn-server-web-proxy-2.2.0.jar",
+    "hbase-hadoop2-compat-1.2.0-cdh5.14.0.jar",
+    "hadoop-yarn-client-2.6.0-cdh5.12.0.jar",
+    "hadoop-annotations-2.6.0-cdh5.14.0.jar",
+    "hadoop-yarn-api-2.6.0-cdh5.14.0.jar",
+    "hadoop-common-2.6.0-cdh5.14.0.jar",
     // Others
     "jasper-runtime-5.5.23.jar",
-    "findbugs-annotations-1.3.9-1.jar"
+    "findbugs-annotations-1.3.9-1.jar",
+    "scalactic_2.11-3.0.8.jar",
+    "scala-reflect-2.11.12.jar",
+    "scala-xml_2.11-1.2.0.jar",
+    "scala-parser-combinators_2.11-1.0.4.jar",
+    "scala-compiler-2.11.12.jar",
+    // Already in Spark
+    "lz4-1.3.0.jar"
   )
   val cp = (fullClasspath in assembly).value
-  cp filter { f => excludedDeps.contains(f.data.getName) }
+  cp filter { f =>
+    val r = excludedDeps.contains(f.data.getName)
+    val name = f.data.getName
+    if (name.startsWith("protobuf-java") ||
+//        name.startsWith("jython-standalone") ||
+//        name.startsWith("netty") ||
+        name.startsWith("spark")) {
+      println(s">>> Found: $name")
+    }
+    r
+  }
 }
+
+// Shading protobuf-java-2.5.0.jar as it is part of Spark (and spark-shell)
+// $SPARK_HOME/jars/protobuf-java-2.5.0.jar
+// TIP Use getClass().getProtectionDomain().getCodeSource() to know the location of a class
+assemblyShadeRules in assembly := Seq(
+  ShadeRule.rename("com.google.protobuf.**" -> "shaded.protobuf.@1").inAll,
+  ShadeRule.rename("io.netty.**" -> "shaded.netty.@1").inAll
+)

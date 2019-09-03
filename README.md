@@ -115,10 +115,25 @@ The below session uses `spark-shell` for demonstration purposes.
 **NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
 ```
-$ spark-shell --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar
-...
-scala> spark.version
-res0: String = 2.4.3
+// Create table first
+$ ./sqlshell.sh
+
+splice> create table t1 (id int, name varchar(50));
+0 rows inserted/updated/deleted
+
+splice> insert into t1 values (0, 'The connector works!');
+1 row inserted/updated/deleted
+
+// Use Spark 2.2 with Hadoop 2.6 or compatible version
+// e.g. spark-2.2.3-bin-hadoop2.6.tgz
+// https://archive.apache.org/dist/spark/spark-2.2.3/
+// java.lang.NoSuchMethodError: org.apache.hadoop.mapreduce.InputSplit.getLocationInfo()[Lorg/apache/hadoop/mapred/SplitLocationInfo;
+
+$ spark-shell --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar
+
+assert(spark.version == "2.4.3", "The connector works just fine with Spark 2.4.3")
+
+assert(spark.version != "2.2.3", "FIXME: The connector does not work with Spark 2.2.3") 
 
 val user = "splice"
 val password = "admin"
@@ -127,9 +142,9 @@ val table = "t1"
 val t1 = spark.read.format("spliceV1").option("url", url).option("table", table).load
 
 scala> t1.show
-+---+--------------+
-| id|          name|
-+---+--------------+
-|  0|splice machine|
-+---+--------------+
++---+--------------------+
+| ID|                NAME|
++---+--------------------+
+|  0|The connector works!|
++---+--------------------+
 ```
