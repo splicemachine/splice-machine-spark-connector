@@ -17,6 +17,11 @@ val hadoopVersion = s"2.6.0-$envClassifier"
 // java.lang.NoClassDefFoundError: com/splicemachine/access/HConfiguration
 // https://stackoverflow.com/a/46763742/1305344
 
+val excludedDeps = Seq(
+  ExclusionRule(organization = "org.xerial.snappy", name = "snappy-java"),
+  ExclusionRule(organization = "tomcat", name = "jasper-compiler")
+)
+
 libraryDependencies ++= Seq(
   "splice_spark",
   "hbase_sql",
@@ -32,11 +37,12 @@ val scalaUtilClassifier = Def.setting {
 }
 libraryDependencies += spliceDep("scala_util", scalaUtilClassifier.value)
 
-libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion
+libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion excludeAll(excludedDeps: _*)
+
 // Required to ensure proper dependency
 // (otherwise cdh5.12.0 version was resolved and used)
-libraryDependencies += "org.apache.hadoop" % "hadoop-mapreduce-client-core" % hadoopVersion
-libraryDependencies += "org.apache.hbase" % "hbase-server" % hbaseVersion
+libraryDependencies += "org.apache.hadoop" % "hadoop-mapreduce-client-core" % hadoopVersion excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.hbase" % "hbase-server" % hbaseVersion excludeAll (excludedDeps: _*)
 
 resolvers +=
   "splicemachine-public" at "http://repository.splicemachine.com/nexus/content/groups/public"
@@ -46,7 +52,7 @@ resolvers +=
 resolvers += Resolver.mavenLocal
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
-libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.9" force()
+libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.9" force() excludeAll (excludedDeps: _*)
 
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 
@@ -63,6 +69,6 @@ libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer
 libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test
 parallelExecution in Test := false
 
-def spliceDep(name: String, classifier: String = envClassifier): ModuleID = {
-  "com.splicemachine" % name % spliceVersion classifier classifier withSources()
+def spliceDep(name: String, classfr: String = envClassifier): ModuleID = {
+  "com.splicemachine" % name % spliceVersion classifier classfr withSources() excludeAll (excludedDeps: _*)
 }
