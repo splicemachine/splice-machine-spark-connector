@@ -115,7 +115,7 @@ The below session uses `spark-shell` for demonstration purposes.
 **NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
 ```
-$ spark-shell --jars target/scala-2.11/splice-machine-spark-connector_2.11-0.1.jar
+$ spark-shell --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar
 ...
 scala> spark.version
 res0: String = 2.4.3
