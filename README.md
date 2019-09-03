@@ -108,8 +108,6 @@ After you're done with tests, you can stop Splice Machine using `./start-splice-
 
 ## spark-shell
 
-**NOTE** The following **does not work** yet and is tracked as the issue [Using the connector in spark-shell](https://github.com/jaceklaskowski/splice-machine-spark-connector/issues/6).
-
 The below session uses `spark-shell` for demonstration purposes.
 
 **NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
@@ -127,7 +125,6 @@ splice> insert into t1 values (0, 'The connector works!');
 // Use Spark 2.2 with Hadoop 2.6 or compatible version
 // e.g. spark-2.2.3-bin-hadoop2.6.tgz
 // https://archive.apache.org/dist/spark/spark-2.2.3/
-// java.lang.NoSuchMethodError: org.apache.hadoop.mapreduce.InputSplit.getLocationInfo()[Lorg/apache/hadoop/mapred/SplitLocationInfo;
 
 $ spark-shell --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar
 
