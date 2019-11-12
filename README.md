@@ -51,7 +51,7 @@ There are a couple of ways to use the connector in your Spark application:
 
 Use `sbt test` (or `sbt testOnly`) to execute the integration tests.
 
-**NOTE** For some reasons testing in IntelliJ IDEA may or may not always work. Use `sbt test` for reliable reproducible tests.
+**NOTE**: For some reasons testing in IntelliJ IDEA may not always work. Use `sbt test` for reliable reproducible tests.
 
 **NOTE**: Start Splice Machine first, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
