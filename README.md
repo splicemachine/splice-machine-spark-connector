@@ -35,6 +35,8 @@ Once done, the jar file (`target/scala-2.11/splice-machine-spark-connector_2.11-
 
 Optionally, you could `sbt publishLocal` to publish the connector to the local repository, i.e. `~/.ivy2/local`.
 
+**CAUTION**: You may need to run `sbt package` twice (`sbt update` actually) due to some dependencies not being downloaded properly. It is an issue with the build tool (sbt) and Maven properties to resolve proper dependencies.
+
 ## Running
 
 There are a couple of ways to use the connector in your Spark application:
@@ -51,13 +53,12 @@ There are a couple of ways to use the connector in your Spark application:
 
 Use `sbt test` (or `sbt testOnly`) to execute the integration tests.
 
-**NOTE** For some reasons testing in IntelliJ IDEA may or may not always work. Use `sbt test` for reliable reproducible tests.
+**NOTE**: For some reasons testing in IntelliJ IDEA may not always work. Use `sbt test` for reliable reproducible tests.
 
 **NOTE**: Start Splice Machine first, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
 ```
-$ cd $SPLICE_HOME
-
+// In Splice's home directory
 $ ./start-splice-cluster -p cdh5.14.0 -bl
 Running Splice insecure,cdh5.14.0 master and 2 regionservers with CHAOS = false in:
    $SPLICE_HOME/platform_it
@@ -69,6 +70,7 @@ Starting Master and 1 Region Server. Log file is $SPLICE_HOME/platform_it/splice
 Starting Region Server $SPLICE_HOME/platform_it/spliceRegionSvr2.log
   Waiting. . . . . .
 
+// In project's home directory
 $ sbt test
 ...
 [info] Run completed in 25 seconds, 749 milliseconds.
@@ -82,6 +84,7 @@ $ sbt test
 Use `./sqlshell.sh` to execute queries and verify the test results.
 
 ```
+// In Splice's home directory
 $ ./sqlshell.sh
 ...
 SPLICE* - 	jdbc:splice://localhost:1527/splicedb
@@ -90,9 +93,9 @@ SPLICE* - 	jdbc:splice://localhost:1527/splicedb
 splice> show tables in splice;
 TABLE_SCHEM         |TABLE_NAME                                        |CONGLOM_ID|REMARKS
 -------------------------------------------------------------------------------------------------------
-SPLICE              |SPLICEDATASOURCEV1BATCHSPEC                       |1632      |
-SPLICE              |SPLICEDATASOURCEV1STREAMINGSPEC                   |1584      |
-SPLICE              |SPLICESPEC                                        |1616      |
+SPLICE              |SPLICEDATASOURCEV1BATCHSPEC                       |1584      |
+SPLICE              |SPLICEDATASOURCEV1STREAMINGSPEC                   |1600      |
+SPLICE              |SPLICESPEC                                        |1664      |
 
 3 rows selected
 
@@ -108,11 +111,23 @@ After you're done with tests, you can stop Splice Machine using `./start-splice-
 
 ## spark-shell
 
+You should build the data source using `sbt assembly` command.
+
+```
+$ sbt assembly
+...
+[success] Total time: 27 s, completed Nov 13, 2019 10:00:09 AM
+```
+
+Once done, the assembly jar file (`target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar`) is the connector.
+
 The below session uses `spark-shell` for demonstration purposes.
 
 **NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
 ```
+// In Splice's home directory
+
 // Create table first
 $ ./sqlshell.sh
 
@@ -121,14 +136,29 @@ splice> create table t1 (id int, name varchar(50));
 
 splice> insert into t1 values (0, 'The connector works!');
 1 row inserted/updated/deleted
+```
 
-// Use Spark 2.2 with Hadoop 2.6 or compatible version
-// e.g. spark-2.2.3-bin-hadoop2.6.tgz
-// https://archive.apache.org/dist/spark/spark-2.2.3/
+**CAUTION**: `spark-shell` from Apache Spark 2.2 (with Hadoop 2.6 or compatible version), e.g. [Apache Spark 2.2.3](https://archive.apache.org/dist/spark/spark-2.2.3/), does not work.
+
+```
+$ spark-shell --version
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 2.4.4
+      /_/
+
+Using Scala version 2.11.12, OpenJDK 64-Bit Server VM, 1.8.0_222
+Branch
+Compiled by user  on 2019-08-27T21:21:38Z
+Revision
+Url
+Type --help for more information.
 
 $ spark-shell --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar
 
-assert(spark.version == "2.4.3", "The connector works just fine with Spark 2.4.3")
+assert(spark.version == "2.4.4", "The connector works just fine with Spark 2.4.4")
 
 assert(spark.version != "2.2.3", "FIXME: The connector does not work with Spark 2.2.3") 
 
