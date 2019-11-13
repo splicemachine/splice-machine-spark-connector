@@ -83,7 +83,6 @@ assemblyExcludedJars in assembly := {
     // FIXME It is assumed to exist earlier. Make sure nothing got broken
     // Have to be excluded to let shading in sbt-assembly work
     "jython-standalone-2.5.3.jar",
-    "netty-3.10.6.Final.jar",
     // Exclude Spark jars
     "spark-launcher_2.11-2.2.0.cloudera2.jar",
     "spark-yarn_2.11-2.1.0.jar",
