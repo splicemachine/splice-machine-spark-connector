@@ -20,6 +20,8 @@ Consult [Issues](https://github.com/jaceklaskowski/splice-machine-spark-connecto
 
 1. Install [Splice Machine](https://www.splicemachine.com/product/)
 
+1. [Java 8](https://openjdk.java.net/install/)
+
 ## Building
 
 You have to build the data source yourself before first use using `sbt package` command.
@@ -51,15 +53,21 @@ There are a couple of ways to use the connector in your Spark application:
 
 ## Testing
 
-Use `sbt test` (or `sbt testOnly`) to execute the integration tests.
+Make sure you are using Java 8 (or the environment is not going to boot up).
 
-**NOTE**: For some reasons testing in IntelliJ IDEA may not always work. Use `sbt test` for reliable reproducible tests.
+```
+$ java -version
+openjdk version "1.8.0_222"
+OpenJDK Runtime Environment (AdoptOpenJDK)(build 1.8.0_222-b10)
+OpenJDK 64-Bit Server VM (AdoptOpenJDK)(build 25.222-b10, mixed mode)
+```
 
-**NOTE**: Start Splice Machine first, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
+Start Splice Machine first, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
+Remove `-bl` options unless you are starting the Splice Machine instance for the very first time.
 
 ```
 // In Splice's home directory
-$ ./start-splice-cluster -p cdh5.14.0 -bl
+$ ./start-splice-cluster -p cdh5.14.0
 Running Splice insecure,cdh5.14.0 master and 2 regionservers with CHAOS = false in:
    $SPLICE_HOME/platform_it
 Starting ZooKeeper. Log file is $SPLICE_HOME/platform_it/zoo.log
@@ -69,8 +77,12 @@ Starting Master and 1 Region Server. Log file is $SPLICE_HOME/platform_it/splice
   Waiting. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 Starting Region Server $SPLICE_HOME/platform_it/spliceRegionSvr2.log
   Waiting. . . . . .
+```
 
-// In project's home directory
+Execute the integration tests using `sbt test` (or `sbt testOnly`).
+
+```
+// In the connector's home directory
 $ sbt test
 ...
 [info] Run completed in 25 seconds, 749 milliseconds.
@@ -80,6 +92,8 @@ $ sbt test
 [info] All tests passed.
 [success] Total time: 39 s, completed Aug 23, 2019 10:15:23 AM
 ```
+
+**NOTE**: For some reasons testing in IntelliJ IDEA may not always work. Use `sbt test` for reliable reproducible tests.
 
 Use `./sqlshell.sh` to execute queries and verify the test results.
 

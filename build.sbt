@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion := "2.11.12"
 
-val spliceVersion = "2.8.0.1935"
+val spliceVersion = "2.8.0.1945"
 
 // https://github.com/sbt/sbt/issues/5046
 ThisBuild / useCoursier := false
@@ -52,7 +52,9 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion.value % 
 lazy val scalaUtilClassifier = Def.setting {
   s"${envClassifier.value}-${sparkVersion.value}_${scalaBinaryVersion.value}"
 }
-libraryDependencies += spliceDep("scala_util", scalaUtilClassifier.value)
+libraryDependencies += ("com.splicemachine" % "scala_util" % spliceVersion)
+  .classifier(scalaUtilClassifier.value)
+  .withSources()
 
 libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion.value excludeAll(excludedDeps: _*)
 
@@ -72,10 +74,10 @@ resolvers +=
 resolvers += Resolver.mavenLocal
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
-libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.9" force() excludeAll (excludedDeps: _*)
+libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.10" force() excludeAll (excludedDeps: _*)
 
 // Required for assembly to use with spark-shell
-libraryDependencies += "io.netty" % "netty-all" % "4.0.43.Final" force() excludeAll (excludedDeps: _*)
+libraryDependencies += "io.netty" % "netty-all" % "4.0.56.Final" force() excludeAll (excludedDeps: _*)
 
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 
@@ -89,7 +91,7 @@ mavenProps := {
   ()
 }
 
-val scalatestVer = "3.0.8"
+val scalatestVer = "3.1.0"
 libraryDependencies += "org.scalactic" %% "scalactic" % scalatestVer
 libraryDependencies += "org.scalatest" %% "scalatest" % scalatestVer % Test
 parallelExecution in Test := false
@@ -100,3 +102,5 @@ def spliceDep(name: String, classfr: String): ModuleID = {
     .withSources()
     .excludeAll(excludedDeps: _*)
 }
+
+Test / fork := true
