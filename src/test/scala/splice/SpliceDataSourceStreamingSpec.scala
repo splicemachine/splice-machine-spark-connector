@@ -1,12 +1,10 @@
-package splice.v1
+package splice
 
 import java.util.UUID
 
-import splice.BaseSpec
+class SpliceDataSourceStreamingSpec extends BaseSpec {
 
-class SpliceDataSourceV1StreamingSpec extends BaseSpec {
-
-  "Splice Machine Connector (Data Source API V1 / Streaming Mode)" should "support streaming write" in {
+  "Splice Machine Connector (Streaming Mode)" should "support streaming write" in {
 
     import org.apache.spark.sql.streaming.Trigger
 
@@ -16,7 +14,7 @@ class SpliceDataSourceV1StreamingSpec extends BaseSpec {
       .format("rate")
       .load
       .writeStream
-      .format(SpliceDataSourceV1.NAME)
+      .format(SpliceDataSource.NAME)
       .option(SpliceOptions.JDBC_URL, url)
       .option(SpliceOptions.TABLE, tableName)
       .option("checkpointLocation", s"target/checkpointLocation-$tableName-${UUID.randomUUID()}")
@@ -29,7 +27,7 @@ class SpliceDataSourceV1StreamingSpec extends BaseSpec {
     sq.awaitTermination(5.seconds.toMillis)
     sq.stop()
 
-    val expected = s"splice.v1.SpliceSink[${SpliceDataSourceV1.NAME}]"
+    val expected = s"splice.SpliceSink[${SpliceDataSource.NAME}]"
     val progress = sq.lastProgress
     // FIXME lastProgress can be null?!
     val actual = Option(progress).map(_.sink.description).getOrElse(expected)

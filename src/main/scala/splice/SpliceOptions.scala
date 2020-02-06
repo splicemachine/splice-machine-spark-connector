@@ -1,4 +1,4 @@
-package splice.v1
+package splice
 
 class SpliceOptions(val parameters: Map[String, String]) {
   def url: String = parameters(SpliceOptions.JDBC_URL)

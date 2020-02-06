@@ -1,9 +1,9 @@
-package splice.v1
+package splice
 
-import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Row, SQLContext, SparkSession}
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.sources.Filter
+import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 class SpliceRDD(
     sc: SparkContext,

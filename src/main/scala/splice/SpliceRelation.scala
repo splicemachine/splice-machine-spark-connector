@@ -1,4 +1,4 @@
-package splice.v1
+package splice
 
 import com.splicemachine.spark.splicemachine.SplicemachineContext
 import org.apache.spark.rdd.RDD
@@ -14,12 +14,20 @@ class SpliceRelation(
     with InsertableRelation {
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
+    println(">>> [SpliceRelation.buildScan] Registering the splice JDBC driver")
+    // See https://github.com/jaceklaskowski/splice-machine-spark-connector/issues/14
+    new com.splicemachine.db.jdbc.ClientDriver
+
     val spliceCtx = new SplicemachineContext(opts.url)
     // FIXME columnProjection is required
     spliceCtx.rdd(opts.table, requiredColumns)
   }
 
   override def insert(data: DataFrame, overwrite: Boolean): Unit = {
+    println(">>> [SpliceRelation.insert] Registering the splice JDBC driver")
+    // See https://github.com/jaceklaskowski/splice-machine-spark-connector/issues/14
+    new com.splicemachine.db.jdbc.ClientDriver
+
     val spliceCtx = new SplicemachineContext(opts.url)
     val tableName = opts.table
     val isTableAvailable = spliceCtx.tableExists(tableName)
@@ -34,5 +42,5 @@ class SpliceRelation(
 
   override def sqlContext: SQLContext = sparkSession.sqlContext
 
-  override def toString: String = s"${this.getClass.getCanonicalName}[${SpliceDataSourceV1.NAME}]"
+  override def toString: String = s"${this.getClass.getCanonicalName}[${SpliceDataSource.NAME}]"
 }

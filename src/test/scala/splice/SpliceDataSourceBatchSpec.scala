@@ -1,20 +1,19 @@
-package splice.v1
+package splice
 
 import java.util.UUID
 
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
-import splice.BaseSpec
 
-class SpliceDataSourceV1BatchSpec extends BaseSpec {
+class SpliceDataSourceBatchSpec extends BaseSpec {
 
-  "Splice Machine Connector (Data Source API V1 / Batch Mode)" should "support batch reading with explicit schema" in {
+  "Splice Machine Connector (Batch Mode)" should "support batch reading with explicit schema" in {
     val schema = StructType(Seq(
       StructField("ID", LongType),
       StructField("TEST_NAME", StringType)
     ))
     val q = spark
       .read
-      .format(SpliceDataSourceV1.NAME)
+      .format(SpliceDataSource.NAME)
       .schema(schema)
       .option(SpliceOptions.JDBC_URL, url)
       .option(SpliceOptions.TABLE, tableName)
@@ -34,7 +33,7 @@ class SpliceDataSourceV1BatchSpec extends BaseSpec {
     an[IllegalStateException] should be thrownBy {
       spark
         .read
-        .format(SpliceDataSourceV1.NAME)
+        .format(SpliceDataSource.NAME)
         .load
     }
   }
@@ -47,7 +46,7 @@ class SpliceDataSourceV1BatchSpec extends BaseSpec {
     val data = Seq((UUID.randomUUID().toString, testName)).toDF("ID", "TEST_NAME")
     data
       .write
-      .format(SpliceDataSourceV1.NAME)
+      .format(SpliceDataSource.NAME)
       .option(SpliceOptions.JDBC_URL, url)
       .option(SpliceOptions.TABLE, tableName)
       .save
@@ -56,7 +55,7 @@ class SpliceDataSourceV1BatchSpec extends BaseSpec {
   it should "read a dataset from a table" in {
     spark
       .read
-      .format(SpliceDataSourceV1.NAME)
+      .format(SpliceDataSource.NAME)
       .option(SpliceOptions.JDBC_URL, url)
       .option(SpliceOptions.TABLE, tableName)
       .option("spark.sql.warehouse.dir", "target/spark-warehouse")

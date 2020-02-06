@@ -1,4 +1,4 @@
-package splice.v1
+package splice
 
 import com.splicemachine.spark.splicemachine.SplicemachineContext
 import org.apache.spark.sql.execution.streaming.Sink
@@ -7,20 +7,24 @@ import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode}
 
-class SpliceDataSourceV1 extends SchemaRelationProvider
+class SpliceDataSource extends SchemaRelationProvider
   with RelationProvider
   with DataSourceRegister
   with StreamSinkProvider
   with CreatableRelationProvider {
 
-  override def shortName(): String = SpliceDataSourceV1.NAME
+  override def shortName(): String = SpliceDataSource.NAME
 
   /**
-    * For Spark SQL when no schema given explicitly
+    * For structured queries (Spark SQL) with no user-defined schema
     */
   override def createRelation(
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
+    println(">>> [SpliceDataSource.createRelation] Registering the splice JDBC driver")
+    // See https://github.com/jaceklaskowski/splice-machine-spark-connector/issues/14
+    new com.splicemachine.db.jdbc.ClientDriver
+
     val opts = new SpliceOptions(parameters)
     val spliceCtx = new SplicemachineContext(opts.url)
     val schema = spliceCtx.getSchema(opts.table)
@@ -28,7 +32,7 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
   }
 
   /**
-    * For Spark SQL with user-defined schema
+    * For structured queries (Spark SQL) with user-defined schema
     */
   override def createRelation(
       sqlContext: SQLContext,
@@ -52,7 +56,8 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
 
     val spliceTable = createRelation(sqlContext, parameters, dataWithColumnNamesAllUpper.schema)
       .asInstanceOf[SpliceRelation]
-    spliceTable.insert(dataWithColumnNamesAllUpper, overwrite = SaveMode.Overwrite == mode)
+    val overwrite = SaveMode.Overwrite == mode
+    spliceTable.insert(dataWithColumnNamesAllUpper, overwrite)
     spliceTable
   }
 
@@ -69,6 +74,6 @@ class SpliceDataSourceV1 extends SchemaRelationProvider
   }
 }
 
-object SpliceDataSourceV1 {
-  val NAME = "spliceV1"
+object SpliceDataSource {
+  val NAME = "splice"
 }

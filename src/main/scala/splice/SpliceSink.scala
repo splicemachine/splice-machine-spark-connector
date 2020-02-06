@@ -1,8 +1,8 @@
-package splice.v1
+package splice
 
-import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.execution.streaming.Sink
 import org.apache.spark.sql.streaming.OutputMode
+import org.apache.spark.sql.{DataFrame, SQLContext}
 
 class SpliceSink(
     sqlContext: SQLContext,
@@ -15,12 +15,12 @@ class SpliceSink(
     println(s">>> addBatch(batchId=$batchId) url=$url table=$tableName")
     data
       .write
-      .format(SpliceDataSourceV1.NAME)
+      .format(SpliceDataSource.NAME)
       .option(SpliceOptions.JDBC_URL, url)
       .option(SpliceOptions.TABLE, tableName)
       .save
 
   }
 
-  override def toString: String = s"${this.getClass.getCanonicalName}[${SpliceDataSourceV1.NAME}]"
+  override def toString: String = s"${this.getClass.getCanonicalName}[${SpliceDataSource.NAME}]"
 }
