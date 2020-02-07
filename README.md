@@ -240,3 +240,102 @@ scala> t1.show(truncate = false)
 |2  |Insert from sqlshell   |
 +---+-----------------------+
 ```
+
+## Demo: Structured Queries (Spark SQL) with Kafka Data Source
+
+The following demo shows how to use `spark-shell` to execute a structured query over a dataset from Apache Kafka (via [kafka data source](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)).
+
+```
+spark-shell \
+  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
+  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
+```
+
+The demo uses `t1` topic with a Kafka broker listening to `9092` port. The name of the splice table is `kafka`.
+
+```
+// Load a dataset from Kafka
+val values = spark
+  .read
+  .format("kafka")
+  .option("subscribe", "t1")
+  .option("kafka.bootstrap.servers", ":9092")
+  .load
+  .select($"value" cast "string")
+
+val user = "splice"
+val password = "admin"
+val url = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
+
+// Save the dataset to a splice table
+values
+  .write
+  .format("splice")
+  .option("url", url)
+  .option("table", "kafka")
+  .save()
+
+// Check out the splice table
+
+// You can use `sqlshell` of Splice Machine
+// Or better query the table using Spark SQL
+spark
+  .read
+  .format("splice")
+  .option("url", url)
+  .option("table", "kafka")
+  .load
+  .show
+```
+
+## Demo: Streaming Queries (Spark Structured Streaming) with Kafka Data Source
+
+The following demo shows how to use `spark-shell` to execute a streaming query over datasets from Apache Kafka (via [kafka data source](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)).
+
+```
+spark-shell \
+  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
+  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
+```
+
+The demo uses `t1` topic with a Kafka broker listening to `9092` port. The name of the splice table is `kafka`.
+
+```
+val values = spark
+  .readStream
+  .format("kafka")
+  .option("subscribe", "t1")
+  .option("kafka.bootstrap.servers", ":9092")
+  .load
+  .select($"value" cast "string")
+
+assert(values.isStreaming)
+
+val user = "splice"
+val password = "admin"
+val url = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
+
+values
+  .writeStream
+  .format("splice")
+  .option("url", url)
+  .option("table", "kafka")
+  .option("checkpointLocation", "/tmp/splice-checkpointLocation")
+  .start
+
+// After you started the streaming query
+// The splice table is constantly updated with new records from Kafka
+// Use kafka-console-producer.sh --broker-list :9092 --topic t1 to send records to Kafka
+
+// You can use `sqlshell` of Splice Machine
+// Or better query the table using Spark SQL
+spark
+  .read
+  .format("splice")
+  .option("url", url)
+  .option("table", "kafka")
+  .load
+  .show
+```
