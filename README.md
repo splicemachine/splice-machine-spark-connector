@@ -32,7 +32,7 @@ $ sbt clean package
 [success] Total time: 10 s, completed Feb 21, 2020 12:59:56 PM
 ```
 
-You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.2.jar`.
+You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.3.0-SNAPSHOT.jar`.
 
 Optionally, you could `sbt publishLocal` to publish the connector to the local repository, i.e. `~/.ivy2/local`.
 
@@ -79,6 +79,8 @@ Starting Region Server $SPLICE_HOME/platform_it/spliceRegionSvr2.log
 ```
 
 **TIP**: Monitor `$SPLICE_HOME/platform_it/splice.log` log file.
+
+**TIP** You may want to `DROP TABLE` all the tables in `splice` schema, e.g. `show tables in splice` should show no tables.
 
 Execute the integration tests using `sbt test` (or `sbt testOnly`).
 
@@ -155,7 +157,7 @@ $ sbt assembly
 [success] Total time: 49 s, completed Feb 21, 2020 1:05:51 PM
 ```
 
-You should have the connector assembled as `target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar`.
+You should have the connector assembled as `target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar`.
 
 **NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
@@ -179,8 +181,8 @@ splice> insert into t1 values (0, 'The connector works!');
 ```
 // You should be using ASSEMBLY jar
 $ spark-shell \
-    --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
-    --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar
+    --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
+    --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar
 
 val compatibleSparkVersion = "2.2.0"
 assert(
@@ -251,8 +253,8 @@ The following demo shows how to use `spark-shell` to execute a structured query 
 
 ```
 spark-shell \
-  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
-  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
+  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
+  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
 ```
 
@@ -299,8 +301,8 @@ The following demo shows how to use `spark-shell` to execute a streaming query o
 
 ```
 spark-shell \
-  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
-  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
+  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
+  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
 ```
 

@@ -1,6 +1,6 @@
 name := "splice-machine-spark-connector"
 
-version := "0.2"
+version := "0.3.0-SNAPSHOT"
 
 scalaVersion := "2.11.12"
 
