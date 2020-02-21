@@ -27,12 +27,12 @@ Consult [Issues](https://github.com/jaceklaskowski/splice-machine-spark-connecto
 You have to build the data source yourself before first use using `sbt package` command.
 
 ```
-$ sbt package
+$ sbt clean package
 ...
-[success] Total time: 9 s, completed Feb 5, 2020 6:56:19 PM
+[success] Total time: 10 s, completed Feb 21, 2020 12:59:56 PM
 ```
 
-You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.1.jar`.
+You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.2.jar`.
 
 Optionally, you could `sbt publishLocal` to publish the connector to the local repository, i.e. `~/.ivy2/local`.
 
@@ -86,12 +86,12 @@ Execute the integration tests using `sbt test` (or `sbt testOnly`).
 // In the connector's home directory
 $ sbt test
 ...
-[info] Run completed in 19 seconds, 469 milliseconds.
+[info] Run completed in 23 seconds, 955 milliseconds.
 [info] Total number of tests run: 8
 [info] Suites: completed 4, aborted 0
 [info] Tests: succeeded 8, failed 0, canceled 0, ignored 0, pending 0
 [info] All tests passed.
-[success] Total time: 25 s, completed Feb 5, 2020 7:01:09 PM
+[success] Total time: 30 s, completed Feb 21, 2020 1:03:53 PM
 ```
 
 **NOTE**: For some reasons testing in IntelliJ IDEA may not always work. Use `sbt test` for reliable reproducible tests.
@@ -152,10 +152,10 @@ You should build the data source using `sbt assembly` command.
 ```
 $ sbt assembly
 ...
-[success] Total time: 28 s, completed Feb 5, 2020 7:03:12 PM
+[success] Total time: 49 s, completed Feb 21, 2020 1:05:51 PM
 ```
 
-You should have the connector assembled as `target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar`.
+You should have the connector assembled as `target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar`.
 
 **NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
 
@@ -179,8 +179,8 @@ splice> insert into t1 values (0, 'The connector works!');
 ```
 // You should be using ASSEMBLY jar
 $ spark-shell \
-    --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
-    --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar
+    --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
+    --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar
 
 val compatibleSparkVersion = "2.2.0"
 assert(
@@ -208,7 +208,7 @@ val ds = Seq((1, "Insert from spark-shell")).toDF("id", "name")
 ds.write.format("splice").option("url", url).option("table", table).save
 
 // The new rows inserted should be part of the output
-t1.show
+t1.show(truncate = false)
 ```
 
 The above may trigger some WARN messages that you should simply disregard.
@@ -222,12 +222,16 @@ java.net.ConnectException: Connection refused
 	at org.apache.zookeeper.ClientCnxn$SendThread.run(ClientCnxn.java:1081)
 ```
 
-You could also insert new records to the `t1` table, and `t1.show` should include them in the output next time you execute it.
+You could also insert new records to the `t1` table using `sqlshell.sh`, and `t1.show` should include them in the output next time you execute it.
+
+Execute the following `INSERT` in `sqlshell.sh`:
 
 ```
 splice> insert into t1 values (2, 'Insert from sqlshell');
 1 row inserted/updated/deleted
 ```
+
+Execute the following `show` in `spark-shell`:
 
 ```
 scala> t1.show(truncate = false)
@@ -247,8 +251,8 @@ The following demo shows how to use `spark-shell` to execute a structured query 
 
 ```
 spark-shell \
-  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
-  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
+  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
+  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
 ```
 
@@ -295,8 +299,8 @@ The following demo shows how to use `spark-shell` to execute a streaming query o
 
 ```
 spark-shell \
-  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
-  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.1.jar \
+  --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
+  --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.2.jar \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
 ```
 
