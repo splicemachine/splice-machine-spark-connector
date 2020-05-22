@@ -4,19 +4,26 @@ version := "0.3.0-SNAPSHOT"
 
 scalaVersion := "2.11.12"
 
-val spliceVersion = "2.8.0.1945"
+//val spliceVersion = "2.8.0.1945"
+val spliceVersion = "3.1.0.1955-SNAPSHOT"
 
 // https://github.com/sbt/sbt/issues/5046
 ThisBuild / useCoursier := false
 
 lazy val envClassifier = settingKey[String]("")
-envClassifier := "cdh5.14.0"
+//envClassifier := "cdh5.14.0"
+envClassifier := "hdp3.1.0"
 
 lazy val hbaseVersion = settingKey[String]("")
-hbaseVersion := s"1.2.0-${envClassifier.value}"
+//hbaseVersion := s"1.2.0-${envClassifier.value}"
+hbaseVersion := s"2.0.2.3.1.0.0-78"
 
 lazy val hadoopVersion = settingKey[String]("")
-hadoopVersion := s"2.6.0-${envClassifier.value}"
+//hadoopVersion := s"2.6.0-${envClassifier.value}"
+hadoopVersion := s"3.1.1.3.1.0.61-1"
+
+lazy val kafkaVersion = settingKey[String]("")
+kafkaVersion := s"2.0.0.3.1.0.0-78"
 
 // FIXME hbase_sql should actually be dependency of splice_spark
 //  ClassNotFoundException: com.splicemachine.derby.impl.SpliceSpark
@@ -35,15 +42,19 @@ val excludedDeps = Seq(
 )
 
 libraryDependencies ++= Seq(
-  "splice_spark",
+  "splice_spark2",
   "hbase_sql",
   "hbase_storage",
   "hbase_pipeline",
   "spark_sql"
 ).map(spliceDep(_, envClassifier.value))
 
+lazy val printLibDep = taskKey[Unit]("")
+printLibDep := libraryDependencies.value.sortBy(_.toString).foreach(println)
+
 lazy val sparkVersion = settingKey[String]("")
-sparkVersion := "2.2.0.cloudera2"
+//sparkVersion := "2.2.0.cloudera2"
+sparkVersion := "2.3.2.3.1.0.0-78"
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion.value % Provided
 
@@ -61,23 +72,30 @@ libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion.val
 // Required to ensure proper dependency
 // (otherwise cdh5.12.0 version was resolved and used)
 libraryDependencies += "org.apache.hadoop" % "hadoop-mapreduce-client-core" % hadoopVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % hadoopVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-server" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-common" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-hadoop-compat" % hbaseVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.hbase" % "hbase-zookeeper" % hbaseVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.hbase" % "hbase-mapreduce" % hbaseVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.hbase" % "hbase-metrics" % hbaseVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.hbase" % "hbase-metrics-api" % hbaseVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.kafka" %% "kafka" % kafkaVersion.value excludeAll (excludedDeps: _*)
 
+// For development only / local Splice SNAPSHOTs
+resolvers += Resolver.mavenLocal
 resolvers +=
   ("splicemachine-public" at "http://repository.splicemachine.com/nexus/content/groups/public")
     .withAllowInsecureProtocol(true)
 resolvers +=
   "cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
-// For development only / local Splice SNAPSHOTs
-resolvers += Resolver.mavenLocal
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
 libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.10" force() excludeAll (excludedDeps: _*)
 
 // Required for assembly to use with spark-shell
-libraryDependencies += "io.netty" % "netty-all" % "4.0.56.Final" force() excludeAll (excludedDeps: _*)
+//libraryDependencies += "io.netty" % "netty-all" % "4.0.56.Final" force() excludeAll (excludedDeps: _*)
+libraryDependencies += "io.netty" % "netty-all" % "4.1.17.Final" force() excludeAll (excludedDeps: _*)
 
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 
@@ -88,6 +106,7 @@ mavenProps := {
   sys.props("envClassifier") = envClassifier.value
   sys.props("hbase.version") = hbaseVersion.value
   sys.props("hadoop.version") = hadoopVersion.value
+  sys.props("kafka.version") = kafkaVersion.value
   ()
 }
 

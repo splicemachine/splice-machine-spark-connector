@@ -1,7 +1,7 @@
-import com.splicemachine.EngineDriver
+//import com.splicemachine.EngineDriver
 import com.splicemachine.db.jdbc.ClientBaseDataSource
-import com.splicemachine.derby.impl.SpliceSpark
-import com.splicemachine.spark.splicemachine.SplicemachineContext
+//import com.splicemachine.derby.impl.SpliceSpark
+import com.splicemachine.spark2.splicemachine.SplicemachineContext
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
 
@@ -18,9 +18,7 @@ class SpliceSpec extends FlatSpec
   var spliceCtx: SplicemachineContext = _
 
   "Splice database" should "be up and running" in {
-    val dbVer = EngineDriver.driver().getVersion
-    val release = dbVer.getRelease
-    release should startWith("2.8.0")
+    spliceCtx.tableExists("sys.systables")
   }
 
   it should "read a dataset from a table" in {
@@ -47,7 +45,7 @@ class SpliceSpec extends FlatSpec
       .getOrCreate
     import spark.implicits._
 
-    SpliceSpark.setContext(spark.sparkContext)
+//    SpliceSpark.setContext(spark.sparkContext)
 
     // FIXME Splice supports dataframes with uppercase column names only
     val data = Seq((0L, testName)).toDF("ID", "TEST_NAME")

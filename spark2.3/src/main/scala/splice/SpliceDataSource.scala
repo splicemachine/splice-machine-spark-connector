@@ -1,6 +1,6 @@
 package splice
 
-import com.splicemachine.spark.splicemachine.SplicemachineContext
+import com.splicemachine.spark2.splicemachine.SplicemachineContext
 import org.apache.spark.sql.execution.streaming.Sink
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode
@@ -21,12 +21,8 @@ class SpliceDataSource extends SchemaRelationProvider
   override def createRelation(
       sqlContext: SQLContext,
       parameters: Map[String, String]): BaseRelation = {
-    println(">>> [SpliceDataSource.createRelation] Registering the splice JDBC driver")
-    // See https://github.com/jaceklaskowski/splice-machine-spark-connector/issues/14
-    new com.splicemachine.db.jdbc.ClientDriver
-
     val opts = new SpliceOptions(parameters)
-    val spliceCtx = new SplicemachineContext(opts.url)
+    val spliceCtx = new SplicemachineContext(opts.url)  // TODO splice
     val schema = spliceCtx.getSchema(opts.table)
     createRelation(sqlContext, parameters, schema)
   }
@@ -57,6 +53,7 @@ class SpliceDataSource extends SchemaRelationProvider
     val spliceTable = createRelation(sqlContext, parameters, dataWithColumnNamesAllUpper.schema)
       .asInstanceOf[SpliceRelation]
     val overwrite = SaveMode.Overwrite == mode
+    println(s">>> insert: $overwrite $dataWithColumnNamesAllUpper")
     spliceTable.insert(dataWithColumnNamesAllUpper, overwrite)
     spliceTable
   }

@@ -24,6 +24,7 @@ class BaseSpec extends FlatSpec
       .appName(tableName)
       .config("spark.ui.enabled", false)
       .getOrCreate
+    println(s">>> BaseSpec before $spark")
   }
 
   def withSparkSession(testCode: SparkSession => Any): Unit = {

@@ -5,7 +5,7 @@ import sbt._
  */
 object PackagingTypePlugin extends AutoPlugin {
   override val buildSettings = {
-    sys.props += "envClassifier" -> "cdh5.14.0"
+    sys.props += "envClassifier" -> "hdp3.1.0"
     Nil
   }
 }

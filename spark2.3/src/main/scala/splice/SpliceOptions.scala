@@ -28,6 +28,6 @@ object SpliceOptions {
   val USER = "user"
   val PASSWORD = "password"
   val TABLE = "table"
-  val JDBC_INTERNAL_QUERIES = "internal"
-  val JDBC_TEMP_DIRECTORY = "tmp"
+//  val JDBC_INTERNAL_QUERIES = "internal"
+//  val JDBC_TEMP_DIRECTORY = "tmp"
 }
