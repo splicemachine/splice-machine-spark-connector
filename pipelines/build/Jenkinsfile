@@ -63,7 +63,7 @@ node('splice-standalone') {
         ])
         checkout([  
             $class: 'GitSCM', 
-            branches: [[name: source_branch]],
+            branches: [[name: 'DB-9489']],
             doGenerateSubmoduleConfigurations: false, 
             extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'splice-machine-spark-connector']], 
             submoduleCfg: [], 
@@ -98,45 +98,45 @@ node('splice-standalone') {
       dir('splice-machine-spark-connector'){
                 if ("$env_classifier" == "cdh5.12.0"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-${envClassifier.value}"
-                    hadoop_version = "2.6.0-${envClassifier.value}"
+                    hbase_version = "1.2.0-cdh5.12.0"
+                    hadoop_version = "2.6.0-cdh5.12.0"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.12.2"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-${envClassifier.value}"
-                    hadoop_version = "2.6.0-${envClassifier.value}"
+                    hbase_version = "1.2.0-cdh5.12.2"
+                    hadoop_version = "2.6.0-cdh5.12.2"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.12.2-2.3"){
                     env_classifier = "cdh5.12.2"
                     spark_folder = "."
-                    hbase_version = "1.2.0-${envClassifier.value}"
-                    hadoop_version = "2.6.0-${envClassifier.value}"
+                    hbase_version = "1.2.0-cdh5.12.2"
+                    hadoop_version = "2.6.0-cdh5.12.2"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.13.3"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-${envClassifier.value}"
-                    hadoop_version = "2.6.0-${envClassifier.value}"
+                    hbase_version = "1.2.0-cdh5.13.3"
+                    hadoop_version = "2.6.0-cdh5.13.3"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.14.0"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-${envClassifier.value}"
-                    hadoop_version = "2.6.0-${envClassifier.value}"
+                    hbase_version = "1.2.0-cdh5.14.0"
+                    hadoop_version = "2.6.0-cdh5.14.0"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.14.2"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-${envClassifier.value}"
-                    hadoop_version = "2.6.0-${envClassifier.value}"
+                    hbase_version = "1.2.0-cdh5.14.2"
+                    hadoop_version = "2.6.0-cdh5.14.2"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.16.1"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-${envClassifier.value}"
-                    hadoop_version = "2.6.0-${envClassifier.value}"
+                    hbase_version = "1.2.0-cdh5.16.1"
+                    hadoop_version = "2.6.0-cdh5.16.1"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh6.3.0"){
                     spark_folder = "spark2.4"
-                    hbase_version = "2.1.0-${envClassifier.value}"
-                    hadoop_version = "3.0.0-${envClassifier.value}"
-                    kafka_version = "2.2.1-${envClassifier.value}"
+                    hbase_version = "2.1.0-cdh6.3.0"
+                    hadoop_version = "3.0.0-cdh6.3.0"
+                    kafka_version = "2.2.1-cdh6.3.0"
                 } else if ("$env_classifier" == "hdp2.6.1"){
                     spark_folder = "."
                     hbase_version = "1.1.2.2.6.1.0-129"
@@ -164,14 +164,17 @@ node('splice-standalone') {
                     kafka_version = "2.0.0.3.1.0.0-78"
                 }
                 sh """
-                cd pipelines/build/
-                sed -i '/REPLACE_SPLICE_VERSION/$splice_version/' $spark_folder.template
-                sed -i '/REPLACE_ENV_CLASSIFIER/$env_classifier/' $spark_folder.template
-                sed -i '/REPLACE_HBASE_VERSION/$hbase_version/' $spark_folder.template
-                sed -i '/REPLACE_HADOOP_VERSION/$hadoop_version/' $spark_folder.template
-                sed -i '/REPLACE_KAFKA_VERSION/$kafka_version/' $spark_folder.template
-                cp $spark_folder.template ../$spark_folder/build.sbt
-                cd ../$spark_folder/
+                ls
+                cd ./pipelines/build/
+                sed -i \"s/REPLACE_SPLICE_VERSION/$splice_version/\" $spark_folder."template"
+                sed -i \"s/REPLACE_ENV_CLASSIFIER/$env_classifier/\" $spark_folder."template"
+                sed -i \"s/REPLACE_HBASE_VERSION/$hbase_version/\" $spark_folder."template"
+                sed -i \"s/REPLACE_HADOOP_VERSION/$hadoop_version/\" $spark_folder."template"
+                sed -i \"s/REPLACE_KAFKA_VERSION/$kafka_version/\" $spark_folder."template"
+                cp $spark_folder."template" ../../$spark_folder/build.sbt
+                cd ../../$spark_folder/
+                cat build.sbt
+                sbt package
                 sbt package
                 sbt assemble
                 """
@@ -179,60 +182,7 @@ node('splice-standalone') {
         }
     } catch (any) {
         // if there was an exception thrown, the build failed
-        currentBuild.result = "FAILED"
-        throw any
-
-    } finally {
-        // success or failure, always send notifications
-        notifyBuild(currentBuild.result)
-    }
-}
-
-def notifyBuild(String buildStatus = 'STARTED') {
-    // Build status of null means successful.
-    buildStatus =  buildStatus ?: 'SUCCESSFUL'
-    // Override default values based on build status.
-    if (buildStatus == 'STARTED' || buildStatus == 'INPUT') {
-        color = 'YELLOW'
-        colorCode = '#FFFF00'
-    } else if (buildStatus == 'CREATING' || buildStatus == 'DESTROYING'){
-        color = 'BLUE'
-        colorCode = '#0000FF'
-    } else if (buildStatus == 'SUCCESSFUL') {
-        color = 'GREEN'
-        colorCode = '#00FF00'
-    } else if (buildStatus == 'FAILED'){
-        color = 'RED'
-        colorCode = '#FF0000'
-    } else {
-        echo "End of pipeline"
-    }
-}
-
-                        sed -i '/^envClassifier :=.*/d' build.sbt
-                        sed -i '/^hbaseVersion :=.*/d' build.sbt
-                        sed -i '/^hadoopVersion :=.*/d' build.sbt
-                        sed -i '/^kafkaVersion :=.*/d' build.sbt
-                        touch temp.log
-			echo 'val spliceVersion = "${splice_version}"' > temp.log
-                        echo 'envClassifier := "${env_classifier}"' >> temp.log
-                        echo 'hbaseVersion := s"${hbase_version}"' >> temp.log
-                        echo 'hadoopVersion := s"${hadoop_version}"' >> temp.log
-                        echo 'kafkaVersion := s"${kafka_version}"' >> temp.log
-			head -n25 build.sbt > temp2.log
-                        cat temp.log >> temp2.log
-                        tail -n +26 build.sbt >> temp2.log
-                        mv temp2.log build.sbt
-                        cat build.sbt
-                        sbt package
-                        sbt assemble
-                        """
-                    }
-            }
-      }
-    } catch (any) {
-        // if there was an exception thrown, the build failed
-        currentBuild.result = "FAILED"
+        currentBuild.result = "FAILED"A
         throw any
 
     } finally {
