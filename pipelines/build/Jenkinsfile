@@ -98,45 +98,45 @@ node('splice-standalone') {
       dir('splice-machine-spark-connector'){
                 if ("$env_classifier" == "cdh5.12.0"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-cdh5.12.0"
-                    hadoop_version = "2.6.0-cdh5.12.0"
+                    hbase_version = "1.2.0-\${envClassifier.value}"
+                    hadoop_version = "2.6.0-\${envClassifier.value}"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.12.2"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-cdh5.12.2"
-                    hadoop_version = "2.6.0-cdh5.12.2"
+                    hbase_version = "1.2.0-\${envClassifier.value}"
+                    hadoop_version = "2.6.0-\${envClassifier.value}"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.12.2-2.3"){
                     env_classifier = "cdh5.12.2"
                     spark_folder = "."
-                    hbase_version = "1.2.0-cdh5.12.2"
-                    hadoop_version = "2.6.0-cdh5.12.2"
+                    hbase_version = "1.2.0-\${envClassifier.value}"
+                    hadoop_version = "2.6.0-\${envClassifier.value}"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.13.3"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-cdh5.13.3"
-                    hadoop_version = "2.6.0-cdh5.13.3"
+                    hbase_version = "1.2.0-\${envClassifier.value}"
+                    hadoop_version = "2.6.0-\${envClassifier.value}"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.14.0"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-cdh5.14.0"
-                    hadoop_version = "2.6.0-cdh5.14.0"
+                    hbase_version = "1.2.0-\${envClassifier.value}"
+                    hadoop_version = "2.6.0-\${envClassifier.value}"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.14.2"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-cdh5.14.2"
-                    hadoop_version = "2.6.0-cdh5.14.2"
+                    hbase_version = "1.2.0-\${envClassifier.value}"
+                    hadoop_version = "2.6.0-\${envClassifier.value}"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh5.16.1"){
                     spark_folder = "."
-                    hbase_version = "1.2.0-cdh5.16.1"
-                    hadoop_version = "2.6.0-cdh5.16.1"
+                    hbase_version = "1.2.0-\${envClassifier.value}"
+                    hadoop_version = "2.6.0-\${envClassifier.value}"
                     kafka_version = "0.10.0-kafka-2.1.0"
                 } else if ("$env_classifier" == "cdh6.3.0"){
                     spark_folder = "spark2.4"
-                    hbase_version = "2.1.0-cdh6.3.0"
-                    hadoop_version = "3.0.0-cdh6.3.0"
-                    kafka_version = "2.2.1-cdh6.3.0"
+                    hbase_version = "2.1.0-\${envClassifier.value}"
+                    hadoop_version = "3.0.0-\${envClassifier.value}"
+                    kafka_version = "2.2.1-\${envClassifier.value}"
                 } else if ("$env_classifier" == "hdp2.6.1"){
                     spark_folder = "."
                     hbase_version = "1.1.2.2.6.1.0-129"
@@ -174,10 +174,10 @@ node('splice-standalone') {
                 cp $spark_folder."template" ../../$spark_folder/build.sbt
                 cd ../../$spark_folder/
                 cat build.sbt
-                sbt package
-                sbt package
-                sbt assemble
                 """
+                sh "sbt package"
+                sh "sbt package"
+                sh "sbt assemble"
             }
         }
     } catch (any) {

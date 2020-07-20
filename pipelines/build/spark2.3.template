@@ -45,7 +45,7 @@ libraryDependencies ++= Seq(
   "hbase_storage",
   "hbase_pipeline",
   "spark_sql"
-).map(spliceDep(_, "REPLACE_ENV_CLASSIFIER"))
+).map(spliceDep(_, ${envClassifier.value}))
 
 libraryDependencies ++= Seq(
   "db-engine"
