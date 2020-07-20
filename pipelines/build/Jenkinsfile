@@ -165,13 +165,13 @@ node('splice-standalone') {
                 }
                 sh """
                 cd pipelines/build/
-                sed -i '/REPLACE_SPLICE_VERSION/$splice_version/' build.sbt
-                sed -i '/REPLACE_ENV_CLASSIFIER/$env_classifier/' build.sbt
-                sed -i '/REPLACE_HBASE_VERSION/$hbase_version/' build.sbt
-                sed -i '/REPLACE_HADOOP_VERSION/$hadoop_version/' build.sbt
-                sed -i '/REPLACE_KAFKA_VERSION/$kafka_version/' build.sbt
+                sed -i '/REPLACE_SPLICE_VERSION/$splice_version/' $spark_folder.template
+                sed -i '/REPLACE_ENV_CLASSIFIER/$env_classifier/' $spark_folder.template
+                sed -i '/REPLACE_HBASE_VERSION/$hbase_version/' $spark_folder.template
+                sed -i '/REPLACE_HADOOP_VERSION/$hadoop_version/' $spark_folder.template
+                sed -i '/REPLACE_KAFKA_VERSION/$kafka_version/' $spark_folder.template
                 cp $spark_folder.template ../$spark_folder/build.sbt
-                cat build.sbt
+                cd ../$spark_folder/
                 sbt package
                 sbt assemble
                 """
