@@ -61,13 +61,14 @@ OpenJDK Runtime Environment (AdoptOpenJDK)(build 1.8.0_222-b10)
 OpenJDK 64-Bit Server VM (AdoptOpenJDK)(build 25.222-b10, mixed mode)
 ```
 
-Start Splice Machine first, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
+Start Splice Machine first, e.g. `./start-splice-cluster -p cdh6.3.0 -bl`.
 Remove `-bl` options unless you are starting the Splice Machine instance for the very first time.
+For Spark 2.4, use cdh6.3.0 as the environment.  For Spark 2.3, use hdp3.1.0 .
 
 ```
 // In Splice's home directory
-$ ./start-splice-cluster -p cdh5.14.0 -bl
-Running Splice insecure,cdh5.14.0 master and 2 regionservers with CHAOS = false in:
+$ ./start-splice-cluster -p cdh6.3.0 -bl
+Running Splice insecure,cdh6.3.0 master and 2 regionservers with CHAOS = false in:
    $SPLICE_HOME/platform_it
 Starting ZooKeeper. Log file is $SPLICE_HOME/platform_it/zoo.log
 Starting YARN. Log file is $SPLICE_HOME/platform_it/yarn.log
@@ -126,9 +127,12 @@ ID                  |TEST_NAME
 
 After you're done with tests, you can stop Splice Machine using `./start-splice-cluster -k`.
 
-## spark-shell (Spark 2.2.0 w/ Hadoop 2.6)
+## spark-shell
 
-**NOTE**: [spark-2.2.0-bin-hadoop2.6.tgz](https://archive.apache.org/dist/spark/spark-2.2.0/spark-2.2.0-bin-hadoop2.6.tgz) was tested to work fine (see [Allow spark-shell to be used to save batch dataframe to splice table](https://github.com/jaceklaskowski/splice-machine-spark-connector/issues/14)).
+**NOTE**: [spark-2.4.5-bin-hadoop2.7.tgz](https://archive.apache.org/dist/spark/spark-2.4.5/spark-2.4.5-bin-hadoop2.7.tgz) and 
+[spark-2.3.0-bin-hadoop2.7.tgz](https://archive.apache.org/dist/spark/spark-2.3.0/spark-2.3.0-bin-hadoop2.7.tgz) were tested to work fine.
+
+The examples in the rest of this section reference Spark 2.4.5 but the same are true for Spark 2.3.0 .
 
 ```
 $ spark-shell --version
@@ -136,10 +140,10 @@ Welcome to
       ____              __
      / __/__  ___ _____/ /__
     _\ \/ _ \/ _ `/ __/  '_/
-   /___/ .__/\_,_/_/ /_/\_\   version 2.2.0
+   /___/ .__/\_,_/_/ /_/\_\   version 2.4.5
       /_/
 
-Using Scala version 2.11.8, OpenJDK 64-Bit Server VM, 1.8.0_222
+Using Scala version 2.11.12, OpenJDK 64-Bit Server VM, 1.8.0_222
 Branch
 Compiled by user jenkins on 2017-06-30T22:58:04Z
 Revision
@@ -147,7 +151,7 @@ Url
 Type --help for more information.
 ```
 
-**TIP**: Make sure to use the proper versions of Apache Spark 2.2.0, Scala 2.11 and Java 1.8.0.
+**TIP**: Make sure to use the proper versions of Apache Spark 2.4 (or 2.3), Scala 2.11, and Java 1.8.0.
 
 You should build the data source using `sbt assembly` command.
 
@@ -159,7 +163,7 @@ $ sbt assembly
 
 You should have the connector assembled as `target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar`.
 
-**NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh5.14.0 -bl`.
+**NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh6.3.0 -bl`.
 
 **NOTE**: The following `CREATE TABLE` and `INSERT` SQL statements are optional since the connector could be used to create a splice table and save (_insert_) rows instead. 
 
@@ -176,7 +180,7 @@ splice> insert into t1 values (0, 'The connector works!');
 1 row inserted/updated/deleted
 ```
 
-**NOTE** Make sure you use `spark-2.2.0-bin-hadoop2.6` or compatible.
+**NOTE** Make sure you use `spark-2.4.5-bin-hadoop2.7`, `spark-2.3.0-bin-hadoop2.7`, or compatible.
 
 ```
 // You should be using ASSEMBLY jar
@@ -184,7 +188,7 @@ $ spark-shell \
     --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
     --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar
 
-val compatibleSparkVersion = "2.2.0"
+val compatibleSparkVersion = "2.4.5"
 assert(
     spark.version == compatibleSparkVersion,
     s"The connector works just fine with Spark $compatibleSparkVersion")
@@ -251,11 +255,14 @@ scala> t1.show(truncate = false)
 
 The following demo shows how to use `spark-shell` to execute a structured query over a dataset from Apache Kafka (via [kafka data source](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)).
 
+Note in the packages option in the spark-shell command, the spark-sql-kafka package is set to version 2.4.5 of Spark.
+Be sure it is set to the version that works for the version of Spark that you are using.
+
 ```
 spark-shell \
   --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
   --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5
 ```
 
 The demo uses `t1` topic with a Kafka broker listening to `9092` port. The name of the splice table is `kafka`.
@@ -299,14 +306,19 @@ spark
 
 The following demo shows how to use `spark-shell` to execute a streaming query over datasets from Apache Kafka (via [kafka data source](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)).
 
+Note in the packages option in the spark-shell command, the spark-sql-kafka package is set to version 2.4.5 of Spark.
+Be sure it is set to the version that works for the version of Spark that you are using.
+
 ```
 spark-shell \
   --jars target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
   --driver-class-path target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5
 ```
 
 The demo uses `t1` topic with a Kafka broker listening to `9092` port. The name of the splice table is `kafka`.
+
+This demo works in Spark 2.4, which supports the foreachBatch function.
 
 ```
 val values = spark
@@ -323,13 +335,19 @@ val user = "splice"
 val password = "admin"
 val url = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
 
-values
+val strQuery = values
   .writeStream
-  .format("splice")
-  .option("url", url)
-  .option("table", "kafka")
   .option("checkpointLocation", "/tmp/splice-checkpointLocation")
-  .start
+  .foreachBatch {
+    (batchDF: DataFrame, batchId: Long) =>
+        batchDF
+          .write
+          .format("splice")
+          .option("url", url)
+          .option("table", "kafka")
+          .option("kafkaServers", ":9092")
+          .save
+  }.start
 
 // After you started the streaming query
 // The splice table is constantly updated with new records from Kafka
@@ -344,4 +362,59 @@ spark
   .option("table", "kafka")
   .load
   .show
+
+// Stop when you're done
+strQuery.stop()
+```
+
+The next demo works in Spark 2.0 and greater.
+
+```
+import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.SparkContext
+import com.splicemachine.spark2.splicemachine.SplicemachineContext
+
+val values = spark
+  .readStream
+  .format("kafka")
+  .option("subscribe", "t1")
+  .option("kafka.bootstrap.servers", ":9092")
+  .load
+  .select($"value" cast "string")
+
+assert(values.isStreaming)
+
+val user = "splice"
+val password = "admin"
+val url = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
+
+val sq = values
+    .writeStream
+    .option("checkpointLocation", s"target/checkpointLocation-$tableName-${UUID.randomUUID()}")
+    .trigger(Trigger.ProcessingTime(1.second))
+    .foreach(
+      new ForeachWriter[Row] {
+        var spliceCtx: SplicemachineContext = _
+        var sparkContext: SparkContext = _
+    
+        def open(partitionId: Long, version: Long): Boolean = {
+          spliceCtx = new SplicemachineContext(jdbcUrl)
+          sparkContext = SparkContext.getOrCreate
+          true
+        }
+    
+        def process(record: Row): Unit =
+          spliceCtx.insert(
+            sparkContext.parallelize(Seq(record)),
+            record.schema,
+            table
+          )
+    
+        def close(errorOrNull: Throwable): Unit = {}
+      }
+    )
+.start()
+
+// Stop when you're done
+strQuery.stop()
 ```
