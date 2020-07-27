@@ -15,7 +15,7 @@ lazy val envClassifier = settingKey[String]("")
 envClassifier := "REPLACE_ENV_CLASSIFIER"
 
 lazy val hbaseVersion = settingKey[String]("")
-hbaseVersion := s"REPLACE_HBASE_VERSION"
+hbaseVersion := s"${envClassifier.value}"
 
 lazy val hadoopVersion = settingKey[String]("")
 hadoopVersion := s"REPLACE_HADOOP_VERSION"
@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
   "hbase_storage",
   "hbase_pipeline",
   "spark_sql"
-).map(spliceDep(_, ${envClassifier.value}))
+).map(spliceDep(_, envClassifier.value))
 
 libraryDependencies ++= Seq(
   "db-engine"
