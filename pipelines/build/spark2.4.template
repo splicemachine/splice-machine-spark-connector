@@ -15,7 +15,7 @@ lazy val envClassifier = settingKey[String]("")
 envClassifier := "REPLACE_ENV_CLASSIFIER"
 
 lazy val hbaseVersion = settingKey[String]("")
-hbaseVersion := s"${envClassifier.value}"
+hbaseVersion := s"REPLACE_HBASE_VERSION"
 
 lazy val hadoopVersion = settingKey[String]("")
 hadoopVersion := s"REPLACE_HADOOP_VERSION"
