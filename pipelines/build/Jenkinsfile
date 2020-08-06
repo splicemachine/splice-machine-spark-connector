@@ -208,8 +208,8 @@ node('splice-standalone') {
                       sh "cd $spark_folder && sbt assembly"
                       sh "ls && cd $spark_folder/target && ls"
                   }
-                if ("$release_flag" == true){
-                    sh "aws s3 cp $spark_folder/target/*/*.jar s3://splice-releases/$splice_version/cluster/SSDS/ --acl public-read "
+                if (release_flag){
+                    sh "aws s3 sync $spark_folder/target/scala-*/ s3://splice-releases/${splice_version}/cluster/SSDS/ --acl public-read --exclude=\\'*\\' --include=\\'*.jar\\' "
                 }
             }
         }
