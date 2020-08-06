@@ -81,7 +81,7 @@ node('splice-standalone') {
         ])
         checkout([  
             $class: 'GitSCM', 
-            branches: [[name: 'DB-9489']],
+            branches: [[name: 'master']],
             doGenerateSubmoduleConfigurations: false, 
             extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'splice-machine-spark-connector']], 
             submoduleCfg: [], 
