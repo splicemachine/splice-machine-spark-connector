@@ -6,7 +6,7 @@ scalaVersion := "2.11.12"
 //scalaVersion := "2.11.6"
 
 //val spliceVersion = "2.8.0.1945"
-val spliceVersion = "3.1.0.1955-SNAPSHOT"
+val spliceVersion = "3.1.0.1967-SNAPSHOT"
 
 // https://github.com/sbt/sbt/issues/5046
 ThisBuild / useCoursier := false
@@ -81,7 +81,7 @@ libraryDependencies += "org.apache.hbase" % "hbase-common" % hbaseVersion.value 
 libraryDependencies += "org.apache.hbase" % "hbase-hadoop-compat" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-zookeeper" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-mapreduce" % hbaseVersion.value excludeAll (excludedDeps: _*)
-libraryDependencies += "org.apache.kafka" %% "kafka" % kafkaVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.kafka" % "kafka_2.11" % kafkaVersion.value excludeAll (excludedDeps: _*)
 
 // For development only / local Splice SNAPSHOTs
 resolvers += Resolver.mavenLocal
