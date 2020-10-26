@@ -19,6 +19,7 @@ assemblyMergeStrategy in assembly := {
   case PathList("META-INF", "io.netty.versions.properties")  => MergeStrategy.first
   // db-engine-2.8.0.1926.jar VS splice_encoding-2.8.0.1926.jar
   case PathList("com", "splicemachine", "utils", _*)  => MergeStrategy.first
+  case PathList("net", "jcip", "annotations", "GuardedBy.class") => MergeStrategy.last
   case PathList(ps @ _*) if ps.last endsWith ".css"  => MergeStrategy.first
   case x =>
     val oldStrategy = (assemblyMergeStrategy in assembly).value
