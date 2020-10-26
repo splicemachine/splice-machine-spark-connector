@@ -1,6 +1,6 @@
 package splice
 
-import com.splicemachine.spark2.splicemachine.SplicemachineContext
+import _root_.com.splicemachine.spark2.splicemachine.SplicemachineContext
 import org.apache.spark.sql.execution.streaming.Sink
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode
