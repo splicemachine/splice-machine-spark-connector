@@ -30,9 +30,10 @@ object KafkaReader {
     val spliceKafkaServers = args.slice(6,7).headOption.getOrElse("localhost:9092")
 //    val spliceKafkaTimeout = args.slice(7,8).headOption.getOrElse("20000")
     val numLoaders = args.slice(7,8).headOption.getOrElse("1").toInt
-    val maxPollRecs = args.slice(8,9).headOption
-    val groupId = args.slice(9,10).headOption.getOrElse("")
-    val clientId = args.slice(10,11).headOption.getOrElse("")
+    val numInserters = args.slice(8,9).headOption.getOrElse("1").toInt
+    val maxPollRecs = args.slice(9,10).headOption
+    val groupId = args.slice(10,11).headOption.getOrElse("")
+    val clientId = args.slice(11,12).headOption.getOrElse("")
 
     val spark = SparkSession.builder.appName(appName).getOrCreate()
 
@@ -53,11 +54,11 @@ object KafkaReader {
 //      StructField("TM", TimestampType, true) :: Nil)
 
     val schema = StructType(
-      StructField("ID", StringType, false) ::
+      StructField("ID", LongType, false) ::
       StructField("PAYLOAD", StringType, true) ::
-      StructField("SRC_SERVER", StringType, true) ::
+      StructField("SRC_SERVER", StringType, false) ::
       StructField("SRC_THREAD", LongType, true) ::
-      StructField("TM_GENERATED", LongType, true) :: Nil)
+      StructField("TM_GENERATED", LongType, false) :: Nil)
 //      StructField("PTN_NSDS", IntegerType, true) ::
 //      StructField("TM_NSDS", LongType, true) :: Nil)
 //      StructField("TM_EXT_KAFKA", LongType, true) :: Nil)
@@ -89,6 +90,7 @@ object KafkaReader {
       .format("kafka")
       .option("subscribe", externalTopic)
       .option("kafka.bootstrap.servers", externalKafkaServers)
+//      .option("timestampFormat", "yyyy/MM/dd HH:mm:ss")
       //.option("minPartitions", minPartitions)  // probably better to rely on num partitions of the external topic
       .option("failOnDataLoss", "false")
 
@@ -101,16 +103,16 @@ object KafkaReader {
     }
     
     val values = reader
-      .load.select(from_json(col("value") cast "string", schema) as "data", col("timestamp") cast "long" as "TM_EXT_KAFKA")
+      .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy/MM/dd HH:mm:ss" )) as "data", col("timestamp") cast "long" as "TM_EXT_KAFKA")
       .select("data.*", "TM_EXT_KAFKA")
       .withColumn("TM_EXT_KAFKA", col("TM_EXT_KAFKA") * 1000)
       .withColumn("TM_SSDS", unix_timestamp * 1000 )
     
     val processing = new AtomicBoolean(true)
     val dataQueue = new LinkedTransferQueue[DataFrame]()
-    val taskQueue = new LinkedBlockingDeque[(Seq[RowForKafka], Long)]()
+    val taskQueue = new LinkedBlockingDeque[(Seq[RowForKafka], Long, String)]()
     val batchCountQueue = new LinkedTransferQueue[Long]()
-    
+
     val batchRegulation = new BatchRegulation(batchCountQueue)
 
     for(i <- 1 to numLoaders) {
@@ -130,26 +132,46 @@ object KafkaReader {
       ).start()
     }
 
-    new Thread(
-      new Inserter(
-        spliceUrl,
-        spliceKafkaServers,
-        spliceKafkaPartitions,
-        spliceTable,
-        values.schema,
-        taskQueue,
-        batchCountQueue,
-        processing
-      )
-    ).start()
-//    println(s"${java.time.Instant.now} insThr ${inserterThread.isAlive} ${inserterThread.getState}")
+    for(i <- 1 to numInserters) {
+      println(s"${java.time.Instant.now} create Inserter I$i")
+      new Thread(
+        new Inserter(
+          "I" + i.toString,
+          spliceUrl,
+          spliceKafkaServers,
+          spliceKafkaPartitions,
+          spliceTable,
+          values.schema,
+          taskQueue,
+          batchCountQueue,
+          processing
+        )
+      ).start()
+      //    println(s"${java.time.Instant.now} insThr ${inserterThread.isAlive} ${inserterThread.getState}")
+    }
 
+//    for(i <- 1 to numInserters) {
+//      new Thread(
+//        new ParallelLoaderInserter(
+//          "PLI" + i.toString,
+//          spliceUrl,
+//          spliceKafkaServers,
+//          spliceKafkaPartitions,
+//          spliceTable,
+//          values.schema,
+//          dataQueue,
+//          processing
+//        )
+//      ).start
+//    }
+    
     val strQuery = values
       .writeStream
       .option("checkpointLocation",s"/tmp/checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
+//      .option("timestampFormat", "yyyy/MM/dd HH:mm:ss")
 //      .trigger(Trigger.ProcessingTime(2.second))
       .foreachBatch {
-        (batchDF: DataFrame, batchId: Long) => {
+        (batchDF: DataFrame, batchId: Long) => try {
           println(s"${java.time.Instant.now} transfer next batch")
           dataQueue.transfer(batchDF)
 //          if( ! batchDF.isEmpty ) {
@@ -198,7 +220,11 @@ object KafkaReader {
 //                    .option("kafkaServers", spliceKafkaServers)
 //                    //.option("kafkaTimeout-milliseconds", spliceKafkaTimeout)
 //                    .save
-          println(s"${java.time.Instant.now} transferred batch having ${batchDF.count}")
+          println(s"${java.time.Instant.now} transferred batch having ${batchDF.count}")  // todo log count as trace or diagnostic
+        } catch {
+          case e: Throwable =>
+            println(s"${java.time.Instant.now} KafkaReader Exception processing batch $batchId having record count ${batchDF.count}")
+            e.printStackTrace
         }
       }.start()
 

@@ -12,12 +12,13 @@ import com.splicemachine.spark2.splicemachine.SplicemachineContext
 import com.splicemachine.spark2.splicemachine.SplicemachineContext.RowForKafka
 
 class Inserter(
+    id: String,
     spliceUrl: String, 
     spliceKafkaServers: String, 
     spliceKafkaPartitions: String,
     spliceTable: String, 
     dfSchema: StructType,
-    taskQueue: BlockingQueue[(Seq[RowForKafka], Long)],
+    taskQueue: BlockingQueue[(Seq[RowForKafka], Long, String)],
     batchCountQueue: BlockingQueue[Long],
     processing: AtomicBoolean
   )
@@ -26,7 +27,8 @@ class Inserter(
   val nsds = new SplicemachineContext(Map(
     "url" -> spliceUrl,
     "KAFKA_SERVERS" -> spliceKafkaServers,
-    "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions
+    "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions,
+    "USE_FLOW_MARKERS" -> "true"
   ))
   
   nsds.setTable(spliceTable, dfSchema)
@@ -42,34 +44,40 @@ class Inserter(
   
   override def run(): Unit =
     do {
-      // From a LinkedBlockingQueue, get object containing topicname and rcd count
-      val task = taskQueue.poll(100L, TimeUnit.MILLISECONDS)
-      if( task != null && task._2 > 0 ) {
-        val lastRows = task._1
-        val batchCount = task._2
-        //lastRows.foreach( _.send(true) )
-        //lastRows.headOption.foreach( _.close )
-        //println(s"${java.time.Instant.now} INS last rows ${lastRows.mkString("\n")}")
-        nsds.sendData(lastRows, true)
-        if( lastRows.headOption.isDefined ) {
-          val topicName = lastRows.head.topicName
-          println(s"${java.time.Instant.now} INS task $topicName $batchCount")
-          // Call NSDS insert
-          nsds.insert_streaming(topicName)
-          println(s"${java.time.Instant.now} INS inserted")
-          // Send rcd count to metrics topic
-          metricsProducer.send(new ProducerRecord(
-            metricsTopic,
-            batchCount
-          ))
-          batchCountQueue.put(batchCount)
-          println(s"${java.time.Instant.now} INS metrics sent")
-        } else {
-          println(s"${java.time.Instant.now} INS ERROR topic name not found")
+      try {
+        // From a LinkedBlockingQueue, get object containing topicname and rcd count
+        val task = taskQueue.poll(100L, TimeUnit.MILLISECONDS)
+        if (task != null && task._2 > 0) {
+          val lastRows = task._1
+          val batchCount = task._2
+          val topicInfo = task._3
+          //lastRows.foreach( _.send(true) )
+          //lastRows.headOption.foreach( _.close )
+          //println(s"${java.time.Instant.now} $id INS last rows ${lastRows.mkString("\n")}")
+          nsds.sendData(lastRows, true)
+          if (lastRows.headOption.isDefined) {
+            //val topicName = lastRows.head.topicName
+            println(s"${java.time.Instant.now} $id INS task $topicInfo $batchCount")
+            // Call NSDS insert
+            nsds.insert_streaming(topicInfo)
+            println(s"${java.time.Instant.now} $id INS inserted")
+            // Send rcd count to metrics topic
+            metricsProducer.send(new ProducerRecord(
+              metricsTopic,
+              batchCount
+            ))
+            //batchCountQueue.put(batchCount)
+            println(s"${java.time.Instant.now} $id INS metrics sent")
+          } else {
+            println(s"${java.time.Instant.now} $id INS ERROR topic name not found")
+          }
+        } else if (task != null && task._2 == 0) {
+          println(s"${java.time.Instant.now} $id INS no recs")
         }
-      } else if( task != null && task._2 == 0 ) {
-        println(s"${java.time.Instant.now} INS no recs")
+      } catch {
+        case e: Throwable =>
+          println(s"${java.time.Instant.now} $id INS ERROR Insert failed")
+          e.printStackTrace
       }
     } while(processing.get)
-  
 }

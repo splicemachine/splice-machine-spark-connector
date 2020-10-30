@@ -114,11 +114,16 @@ object MessageCounter {
   var t0: LocalDateTime = _
   
   def process(): Unit = {
+    var prevKcount = 0L
+//    do {
+//      Thread.sleep(500)
+//      prevKcount = kafkaCount
+//    } while( prevKcount == 0L )
+    
     t0 = now
     kt0 = now
     dt0 = now
     var count = 0L
-    var prevKcount = 0L
     displayHeader
     while(true) {
 //      println(s"\n${(new java.util.Date).toString} Check DB")
