@@ -1,6 +1,6 @@
 package splice
 
-import com.splicemachine.spark2.splicemachine.SplicemachineContext
+import _root_.com.splicemachine.spark2.splicemachine.SplicemachineContext
 //import com.splicemachine.db.impl.sql.execute.ValueRow
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.sources.{BaseRelation, Filter, InsertableRelation, PrunedFilteredScan}
