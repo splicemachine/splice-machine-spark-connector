@@ -19,6 +19,7 @@ assemblyMergeStrategy in assembly := {
   case PathList("META-INF", "io.netty.versions.properties")  => MergeStrategy.first
   // db-engine-2.8.0.1926.jar VS splice_encoding-2.8.0.1926.jar
   case PathList("com", "splicemachine", "utils", _*)  => MergeStrategy.first
+  case PathList("net", "jcip", "annotations", "GuardedBy.class") => MergeStrategy.last
   case PathList(ps @ _*) if ps.last endsWith ".css"  => MergeStrategy.first
   case x =>
     val oldStrategy = (assemblyMergeStrategy in assembly).value
@@ -55,6 +56,7 @@ assemblyExcludedJars in assembly := {
     // Included in / Conflicts with
     // jcl-over-slf4j-1.7.5.jar
     "commons-logging-1.1.1.jar",
+    "commons-lang3-3.6.jar",
     // Included in / Conflicts with
     // aopalliance-repackaged-2.4.0-b34.jar
     "aopalliance-1.0.jar",

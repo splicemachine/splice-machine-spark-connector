@@ -56,6 +56,7 @@ assemblyExcludedJars in assembly := {
     // Included in / Conflicts with
     // jcl-over-slf4j-1.7.5.jar
     "commons-logging-1.1.1.jar",
+    "commons-lang3-3.7.jar",
     // Included in / Conflicts with
     // aopalliance-repackaged-2.4.0-b34.jar
     "aopalliance-1.0.jar",
