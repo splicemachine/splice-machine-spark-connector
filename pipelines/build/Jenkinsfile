@@ -209,7 +209,7 @@ node('splice-standalone') {
                       sh "ls && cd $spark_folder/target && ls"
                   }
                 if (release_flag){
-                    sh "aws s3 sync $spark_folder/target/scala-*/ s3://splice-releases/${splice_version}/cluster/SSDS/ --acl public-read --exclude=\\'*\\' --include=\\'*.jar\\' "
+                    sh "aws s3 sync $spark_folder/target/scala-*/ s3://splice-releases/${splice_version}/cluster/SSDS/${env_classifier}/ --acl public-read --exclude=\\'*\\' --include=\\'*.jar\\' "
                 }
             }
         }
