@@ -16,6 +16,7 @@ class Inserter(
     spliceUrl: String, 
     spliceKafkaServers: String, 
     spliceKafkaPartitions: String,
+    useFlowMarkers: Boolean,
     spliceTable: String, 
     dfSchema: StructType,
     taskQueue: BlockingQueue[(Seq[RowForKafka], Long, String)],
@@ -28,7 +29,7 @@ class Inserter(
     "url" -> spliceUrl,
     "KAFKA_SERVERS" -> spliceKafkaServers,
     "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions,
-    "USE_FLOW_MARKERS" -> "true"
+    "USE_FLOW_MARKERS" -> useFlowMarkers.toString
   ))
   
   nsds.setTable(spliceTable, dfSchema)

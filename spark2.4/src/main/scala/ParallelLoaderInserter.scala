@@ -19,6 +19,7 @@ class ParallelLoaderInserter(
     spliceUrl: String,
     spliceKafkaServers: String,
     spliceKafkaPartitions: String,
+    useFlowMarkers: Boolean,
     spliceTable: String,
     dfSchema: StructType,
     dataQueue: BlockingQueue[DataFrame],
@@ -36,7 +37,7 @@ class ParallelLoaderInserter(
     "url" -> spliceUrl,
     "KAFKA_SERVERS" -> spliceKafkaServers,
     "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions,
-    "USE_FLOW_MARKERS" -> "true"
+    "USE_FLOW_MARKERS" -> useFlowMarkers.toString
   ))
 
   val batchCount = new AtomicLong()
