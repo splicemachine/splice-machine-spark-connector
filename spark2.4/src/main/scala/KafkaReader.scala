@@ -51,29 +51,10 @@ object KafkaReader {
     // Create schema from ddl string like
     //    "ID STRING NOT NULL, LOCATION STRING, TEMPERATURE DOUBLE, HUMIDITY DOUBLE, TM TIMESTAMP"
     var schema = new StructType
-    schemaDDL.split(",").foreach( s => {
+    schemaDDL.split(",").foreach{ s =>
       val f = s.trim.split(" ")
       schema = schema.add( f(0) , f(1) , ! s.toUpperCase.contains("NOT NULL") )
-    })
-
-    // Keep for reference -- Weather demo
-    //    val schema = StructType(
-//      StructField("ID", StringType, false) ::
-//      StructField("LOCATION", StringType, true) ::
-//      StructField("TEMPERATURE", DoubleType, true) ::
-//      StructField("HUMIDITY", DoubleType, true) ::
-//      StructField("TM", TimestampType, true) :: Nil)
-
-    // Keep for reference -- Performance test (first five fields)
-//    val schema = StructType(
-//      StructField("ID", LongType, false) ::
-//      StructField("PAYLOAD", StringType, true) ::
-//      StructField("SRC_SERVER", StringType, false) ::
-//      StructField("SRC_THREAD", LongType, true) ::
-//      StructField("TM_GENERATED", LongType, false) :: Nil)
-////      StructField("PTN_NSDS", IntegerType, true) ::
-////      StructField("TM_NSDS", LongType, true) :: Nil)
-////      StructField("TM_EXT_KAFKA", LongType, true) :: Nil)
+    }
 
 //    val schema = new SplicemachineContext(spliceUrl, externalKafkaServers).getSchema(spliceTable)
 
@@ -113,11 +94,10 @@ object KafkaReader {
       reader.option("kafka.client.id", s"$group-$clientId")  // probably should use uuid instead of user input TODO
     }
     
-    val values = if( useFlowMarkers ) {
+    val values = if (useFlowMarkers) {
       reader
         .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy/MM/dd HH:mm:ss" )) as "data", col("timestamp") cast "long" as "TM_EXT_KAFKA")
-        .select("data.*", "TM_EXT_KAFKA")
-        .withColumn("TM_EXT_KAFKA", col("TM_EXT_KAFKA") * 1000)
+        .selectExpr("data.*", "TM_EXT_KAFKA * 1000 as TM_EXT_KAFKA" )
         .withColumn("TM_SSDS", unix_timestamp * 1000 )
     } else {
       reader
