@@ -55,7 +55,7 @@ lazy val printLibDep = taskKey[Unit]("")
 printLibDep := libraryDependencies.value.sortBy(_.toString).foreach(println)
 
 lazy val sparkVersion = settingKey[String]("")
-sparkVersion := s"2.4.0-${envClassifier.value}"
+sparkVersion := s"2.3.0-${envClassifier.value}"
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion.value % Provided
 
