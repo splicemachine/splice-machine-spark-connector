@@ -79,7 +79,7 @@ libraryDependencies += "org.apache.hbase" % "hbase-common" % hbaseVersion.value 
 libraryDependencies += "org.apache.hbase" % "hbase-hadoop-compat" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-zookeeper" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-mapreduce" % hbaseVersion.value excludeAll (excludedDeps: _*)
-libraryDependencies += "org.apache.kafka" %% "kafka" % kafkaVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.kafka" % "kafka_2.11" % kafkaVersion.value excludeAll (excludedDeps: _*)
 
 // For development only / local Splice SNAPSHOTs
 resolvers += Resolver.mavenLocal
