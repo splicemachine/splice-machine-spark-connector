@@ -9,12 +9,12 @@ properties([
         choiceParam(
             description: 'Avaliable platforms to build off of',
             name: 'Platform',
-            choices: 'cdh5.12.0\ncdh5.12.2\ncdh5.12.2-2.3\ncdh5.13.3\ncdh5.14.0\ncdh5.14.2\ncdh5.16.1\ncdh6.3.0\nhdp2.6.1\nhdp2.6.3\nhdp2.6.4\nhdp2.6.5\nhdp3.1.0\nhdp3.1.5'
+            choices: 'hdp3.1.0\nhdp3.1.5'
         ),
         stringParam(
-            description: 'Tag to build off of i.e. 3.0.1.1987',
+            description: 'Tag to build off of i.e. 3.0.1.1998',
             name: 'Tag',
-            defaultValue: '3.0.1.1987'
+            defaultValue: '3.0.1.1998'
         ),
         booleanParam(
             defaultValue: false, 
