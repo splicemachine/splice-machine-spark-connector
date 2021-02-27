@@ -10,6 +10,7 @@ class Loader(
               spliceUrl: String,
               spliceKafkaServers: String,
               spliceKafkaPartitions: String,
+              useFlowMarkers: Boolean,
               dataQueue: BlockingQueue[DataFrame],
               taskQueue: BlockingDeque[(Seq[RowForKafka], Long, String)],
               batchRegulation: BatchRegulation,
@@ -22,7 +23,7 @@ class Loader(
     "url" -> spliceUrl,
     "KAFKA_SERVERS" -> spliceKafkaServers,
     "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions,
-    "USE_FLOW_MARKERS" -> "true"
+    "USE_FLOW_MARKERS" -> useFlowMarkers.toString
   ))
   
 //  val s0 = Seq.empty[String]

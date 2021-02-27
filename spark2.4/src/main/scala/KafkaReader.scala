@@ -24,16 +24,18 @@ object KafkaReader {
     val appName = args(0)
     val externalKafkaServers = args(1)
     val externalTopic = args(2)
-    val spliceUrl = args(3)
-    val spliceTable = args(4)
-    val spliceKafkaPartitions = args.slice(5,6).headOption.getOrElse("1")
+    val schemaDDL = args(3)
+    val spliceUrl = args(4)
+    val spliceTable = args(5)
     val spliceKafkaServers = args.slice(6,7).headOption.getOrElse("localhost:9092")
+    val spliceKafkaPartitions = args.slice(7,8).headOption.getOrElse("1")
 //    val spliceKafkaTimeout = args.slice(7,8).headOption.getOrElse("20000")
-    val numLoaders = args.slice(7,8).headOption.getOrElse("1").toInt
-    val numInserters = args.slice(8,9).headOption.getOrElse("1").toInt
-    val maxPollRecs = args.slice(9,10).headOption
-    val groupId = args.slice(10,11).headOption.getOrElse("")
-    val clientId = args.slice(11,12).headOption.getOrElse("")
+    val numLoaders = args.slice(8,9).headOption.getOrElse("1").toInt
+    val numInserters = args.slice(9,10).headOption.getOrElse("1").toInt
+    val useFlowMarkers = args.slice(10,11).headOption.getOrElse("false").toBoolean
+    val maxPollRecs = args.slice(11,12).headOption
+    val groupId = args.slice(12,13).headOption.getOrElse("")
+    val clientId = args.slice(13,14).headOption.getOrElse("")
 
     val spark = SparkSession.builder.appName(appName).getOrCreate()
 
@@ -45,23 +47,14 @@ object KafkaReader {
 //
 //    val metricsProducer = new KafkaProducer[Integer, Long](props)
 //    val metricsTopic = "ssds-metrics"
-
-    //    val schema = StructType(
-//      StructField("ID", StringType, false) ::
-//      StructField("LOCATION", StringType, true) ::
-//      StructField("TEMPERATURE", DoubleType, true) ::
-//      StructField("HUMIDITY", DoubleType, true) ::
-//      StructField("TM", TimestampType, true) :: Nil)
-
-    val schema = StructType(
-      StructField("ID", LongType, false) ::
-      StructField("PAYLOAD", StringType, true) ::
-      StructField("SRC_SERVER", StringType, false) ::
-      StructField("SRC_THREAD", LongType, true) ::
-      StructField("TM_GENERATED", LongType, false) :: Nil)
-//      StructField("PTN_NSDS", IntegerType, true) ::
-//      StructField("TM_NSDS", LongType, true) :: Nil)
-//      StructField("TM_EXT_KAFKA", LongType, true) :: Nil)
+    
+    // Create schema from ddl string like
+    //    "ID STRING NOT NULL, LOCATION STRING, TEMPERATURE DOUBLE, HUMIDITY DOUBLE, TM TIMESTAMP"
+    var schema = new StructType
+    schemaDDL.split(",").foreach{ s =>
+      val f = s.trim.split(" ")
+      schema = schema.add( f(0) , f(1) , ! s.toUpperCase.contains("NOT NULL") )
+    }
 
 //    val schema = new SplicemachineContext(spliceUrl, externalKafkaServers).getSchema(spliceTable)
 
@@ -90,7 +83,6 @@ object KafkaReader {
       .format("kafka")
       .option("subscribe", externalTopic)
       .option("kafka.bootstrap.servers", externalKafkaServers)
-//      .option("timestampFormat", "yyyy/MM/dd HH:mm:ss")
       //.option("minPartitions", minPartitions)  // probably better to rely on num partitions of the external topic
       .option("failOnDataLoss", "false")
 
@@ -102,11 +94,16 @@ object KafkaReader {
       reader.option("kafka.client.id", s"$group-$clientId")  // probably should use uuid instead of user input TODO
     }
     
-    val values = reader
-      .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy/MM/dd HH:mm:ss" )) as "data", col("timestamp") cast "long" as "TM_EXT_KAFKA")
-      .select("data.*", "TM_EXT_KAFKA")
-      .withColumn("TM_EXT_KAFKA", col("TM_EXT_KAFKA") * 1000)
-      .withColumn("TM_SSDS", unix_timestamp * 1000 )
+    val values = if (useFlowMarkers) {
+      reader
+        .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy/MM/dd HH:mm:ss" )) as "data", col("timestamp") cast "long" as "TM_EXT_KAFKA")
+        .selectExpr("data.*", "TM_EXT_KAFKA * 1000 as TM_EXT_KAFKA" )
+        .withColumn("TM_SSDS", unix_timestamp * 1000 )
+    } else {
+      reader
+        .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy/MM/dd HH:mm:ss" )) as "data")
+        .select("data.*")
+    }
     
     val processing = new AtomicBoolean(true)
     val dataQueue = new LinkedTransferQueue[DataFrame]()
@@ -123,6 +120,7 @@ object KafkaReader {
           spliceUrl,
           spliceKafkaServers,
           spliceKafkaPartitions,
+          useFlowMarkers,
           dataQueue,
           taskQueue,
           batchRegulation,
@@ -140,6 +138,7 @@ object KafkaReader {
           spliceUrl,
           spliceKafkaServers,
           spliceKafkaPartitions,
+          useFlowMarkers,
           spliceTable,
           values.schema,
           taskQueue,
@@ -157,6 +156,7 @@ object KafkaReader {
 //          spliceUrl,
 //          spliceKafkaServers,
 //          spliceKafkaPartitions,
+//          useFlowMarkers,
 //          spliceTable,
 //          values.schema,
 //          dataQueue,
@@ -168,7 +168,6 @@ object KafkaReader {
     val strQuery = values
       .writeStream
       .option("checkpointLocation",s"/tmp/checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
-//      .option("timestampFormat", "yyyy/MM/dd HH:mm:ss")
 //      .trigger(Trigger.ProcessingTime(2.second))
       .foreachBatch {
         (batchDF: DataFrame, batchId: Long) => try {
