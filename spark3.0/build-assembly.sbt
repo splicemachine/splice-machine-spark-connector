@@ -49,6 +49,7 @@ assemblyExcludedJars in assembly := {
     // NOTE a dependency version mismatch
     "commons-beanutils-1.9.3.jar",
     // Conflicts with com/splicemachine/utilities
+    "commons-lang3-3.7.jar",
     "commons-lang3-3.9.jar",
     // Included in / Conflicts with
     // jython-standalone-2.5.3.jar
