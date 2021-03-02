@@ -58,6 +58,11 @@ class SpliceSpec extends FlatSpec
   }
 
   before {
+    SparkSession
+      .builder()
+      .master("local[*]")
+      .config("spark.ui.enabled", false)
+      .getOrCreate
     spliceCtx = new SplicemachineContext(url)
   }
 }

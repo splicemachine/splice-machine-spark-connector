@@ -2,7 +2,7 @@ package splice
 
 import java.util.UUID
 
-import com.splicemachine.spark2.splicemachine.SplicemachineContext
+import _root_.com.splicemachine.spark2.splicemachine.SplicemachineContext
 import org.apache.spark.SparkContext
 
 import concurrent.duration._
@@ -78,7 +78,7 @@ class SpliceDataSourceStreamingSpec extends BaseSpec {
         )
         .start()
 
-      handleSQ(sq, "ForeachWriterProvider")
+      handleSQ(sq, "ForeachWriter")
     }
   }
 
