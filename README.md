@@ -193,7 +193,7 @@ $ spark-shell \
 val compatibleSparkVersion = "2.4.5"
 assert(
     spark.version == compatibleSparkVersion,
-    s"The connector works just fine with Spark $compatibleSparkVersion")
+    s"The connector doesn't work with Spark $compatibleSparkVersion")
 
 val user = "splice"
 val password = "admin"
