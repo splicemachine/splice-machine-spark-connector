@@ -32,7 +32,9 @@ $ sbt clean package
 [success] Total time: 10 s, completed Feb 21, 2020 12:59:56 PM
 ```
 
-You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.3.0-SNAPSHOT.jar` for the Spark 2.x versions.  For Spark 3.x, it will be `target/scala-2.12/splice-machine-spark-connector_2.12-0.3.0-SNAPSHOT.jar`.
+You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.3.0-SNAPSHOT.jar` for the Spark 2.x versions.
+
+For Spark 3.x, it will be `target/scala-2.12/splice-machine-spark-connector_2.12-0.3.0-SNAPSHOT.jar`.
 
 Optionally, you could `sbt publishLocal` to publish the connector to the local repository, i.e. `~/.ivy2/local`.
 
@@ -63,7 +65,13 @@ OpenJDK 64-Bit Server VM (AdoptOpenJDK)(build 25.222-b10, mixed mode)
 
 Start Splice Machine first, e.g. `./start-splice-cluster -p cdh6.3.0 -bl`.
 Remove `-bl` options unless you are starting the Splice Machine instance for the very first time.
-For Spark 3.0, use dbaas3.0 as the environment.  For Spark 2.4, use cdh6.3.0.  For Spark 2.3, use hdp3.1.0 .
+Use the Splice Machine environment classifier corresponding to the Spark version you're using as shown here:
+
+<table>
+    <tr><td>Spark 3.0</td><td>dbaas3.0</td></tr>
+    <tr><td>Spark 2.4</td><td>cdh6.3.0</td></tr>
+    <tr><td>Spark 2.3</td><td>hdp3.1.0</td></tr>
+</table>
 
 ```
 // In Splice's home directory
@@ -193,7 +201,7 @@ $ spark-shell \
 val compatibleSparkVersion = "2.4.5"
 assert(
     spark.version == compatibleSparkVersion,
-    s"The connector doesn't work with Spark $compatibleSparkVersion")
+    s"Using Spark version ${spark.version}, expected $compatibleSparkVersion")
 
 val user = "splice"
 val password = "admin"
