@@ -1,28 +1,35 @@
 name := "splice-machine-spark-connector"
 
-val spliceVersion = "3.2.0.1980-SNAPSHOT"
+val spliceVersion = "3.2.0.2001-SNAPSHOT"
 
 version := spliceVersion
 
-scalaVersion := "2.11.12"
+scalaVersion := "2.12.10"
+//scalaVersion := "2.11.6"
+
+lazy val scalaMajorVersion = settingKey[String]("")
+scalaMajorVersion := "2.12"
 
 // https://github.com/sbt/sbt/issues/5046
 ThisBuild / useCoursier := false
 
 lazy val envClassifier = settingKey[String]("")
-//envClassifier := "cdh5.14.0"
-envClassifier := "hdp3.1.0"
+//envClassifier := "cdh6.3.0"
+envClassifier := "dbaas3.0"
+
+lazy val distro = settingKey[String]("")
+distro := "cdh6.3.2"
 
 lazy val hbaseVersion = settingKey[String]("")
 //hbaseVersion := s"1.2.0-${envClassifier.value}"
-hbaseVersion := s"2.0.2.3.1.0.0-78"
+hbaseVersion := s"2.1.0-${distro.value}"
 
 lazy val hadoopVersion = settingKey[String]("")
 //hadoopVersion := s"2.6.0-${envClassifier.value}"
-hadoopVersion := s"3.1.1.3.1.0.61-1"
+hadoopVersion := s"3.0.0-${distro.value}"
 
 lazy val kafkaVersion = settingKey[String]("")
-kafkaVersion := s"2.0.0.3.1.0.0-78"
+kafkaVersion := s"2.2.1-${distro.value}"
 
 // FIXME hbase_sql should actually be dependency of splice_spark
 //  ClassNotFoundException: com.splicemachine.derby.impl.SpliceSpark
@@ -37,7 +44,10 @@ val excludedDeps = Seq(
   // FIXME Somehow 2.2.0 is pulled down
   ExclusionRule(organization = "org.apache.spark"),
   // Added later separately
-  ExclusionRule(organization = "com.splicemachine", name = "scala_util")
+  ExclusionRule(organization = "com.splicemachine", name = "scala_util"),
+  ExclusionRule(organization = "javax.ws.rs", name = "javax.ws.rs-api"),
+  ExclusionRule(organization = "org.apache.kafka", name = "kafka_2.11"),
+  ExclusionRule(organization = "org.scala-lang.modules", name = "scala-parser-combinators_2.11")
 )
 
 libraryDependencies ++= Seq(
@@ -48,12 +58,16 @@ libraryDependencies ++= Seq(
   "spark_sql"
 ).map(spliceDep(_, envClassifier.value))
 
+libraryDependencies ++= Seq(
+  "db-engine"
+).map(spliceDep(_, ""))
+
 lazy val printLibDep = taskKey[Unit]("")
 printLibDep := libraryDependencies.value.sortBy(_.toString).foreach(println)
 
 lazy val sparkVersion = settingKey[String]("")
-//sparkVersion := "2.2.0.cloudera2"
-sparkVersion := "2.3.2.3.1.0.0-78"
+//sparkVersion := s"2.4.0-${envClassifier.value}"
+sparkVersion := s"3.0.1"
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion.value % Provided
 
@@ -71,15 +85,13 @@ libraryDependencies += "org.apache.hadoop" % "hadoop-common" % hadoopVersion.val
 // Required to ensure proper dependency
 // (otherwise cdh5.12.0 version was resolved and used)
 libraryDependencies += "org.apache.hadoop" % "hadoop-mapreduce-client-core" % hadoopVersion.value excludeAll (excludedDeps: _*)
-libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % hadoopVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-server" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-common" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-hadoop-compat" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-zookeeper" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-mapreduce" % hbaseVersion.value excludeAll (excludedDeps: _*)
-libraryDependencies += "org.apache.hbase" % "hbase-metrics" % hbaseVersion.value excludeAll (excludedDeps: _*)
-libraryDependencies += "org.apache.hbase" % "hbase-metrics-api" % hbaseVersion.value excludeAll (excludedDeps: _*)
-libraryDependencies += "org.apache.kafka" %% "kafka" % kafkaVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.kafka" % "kafka_2.12" % kafkaVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.scala-lang.modules" % "scala-parser-combinators_2.12" % "1.1.2" excludeAll (excludedDeps: _*)
 
 // For development only / local Splice SNAPSHOTs
 resolvers += Resolver.mavenLocal
@@ -90,11 +102,12 @@ resolvers +=
   "cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
-libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.10" force() excludeAll (excludedDeps: _*)
+libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.10.0" force() excludeAll (excludedDeps: _*)
 
 // Required for assembly to use with spark-shell
-//libraryDependencies += "io.netty" % "netty-all" % "4.0.56.Final" force() excludeAll (excludedDeps: _*)
 libraryDependencies += "io.netty" % "netty-all" % "4.1.17.Final" force() excludeAll (excludedDeps: _*)
+
+//libraryDependencies += "javax.ws.rs" % "javax.ws.rs-api" % "2.1" excludeAll (excludedDeps: _*)
 
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 
@@ -103,9 +116,11 @@ updateOptions := updateOptions.value.withLatestSnapshots(false)
 lazy val mavenProps = settingKey[Unit]("workaround for Maven properties")
 mavenProps := {
   sys.props("envClassifier") = envClassifier.value
+  sys.props("distro") = distro.value
   sys.props("hbase.version") = hbaseVersion.value
   sys.props("hadoop.version") = hadoopVersion.value
   sys.props("kafka.version") = kafkaVersion.value
+  sys.props("scala.binary.version") = scalaMajorVersion.value
   ()
 }
 

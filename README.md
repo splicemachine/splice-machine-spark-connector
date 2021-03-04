@@ -32,7 +32,9 @@ $ sbt clean package
 [success] Total time: 10 s, completed Feb 21, 2020 12:59:56 PM
 ```
 
-You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.3.0-SNAPSHOT.jar`.
+You should have the connector available as `target/scala-2.11/splice-machine-spark-connector_2.11-0.3.0-SNAPSHOT.jar` for the Spark 2.x versions.
+
+For Spark 3.x, it will be `target/scala-2.12/splice-machine-spark-connector_2.12-0.3.0-SNAPSHOT.jar`.
 
 Optionally, you could `sbt publishLocal` to publish the connector to the local repository, i.e. `~/.ivy2/local`.
 
@@ -63,7 +65,13 @@ OpenJDK 64-Bit Server VM (AdoptOpenJDK)(build 25.222-b10, mixed mode)
 
 Start Splice Machine first, e.g. `./start-splice-cluster -p cdh6.3.0 -bl`.
 Remove `-bl` options unless you are starting the Splice Machine instance for the very first time.
-For Spark 2.4, use cdh6.3.0 as the environment.  For Spark 2.3, use hdp3.1.0 .
+Use the Splice Machine environment classifier corresponding to the Spark version you're using as shown here:
+
+<table>
+    <tr><td>Spark 3.0</td><td>dbaas3.0</td></tr>
+    <tr><td>Spark 2.4</td><td>cdh6.3.0</td></tr>
+    <tr><td>Spark 2.3</td><td>hdp3.1.0</td></tr>
+</table>
 
 ```
 // In Splice's home directory
@@ -129,10 +137,11 @@ After you're done with tests, you can stop Splice Machine using `./start-splice-
 
 ## spark-shell
 
-**NOTE**: [spark-2.4.5-bin-hadoop2.7.tgz](https://archive.apache.org/dist/spark/spark-2.4.5/spark-2.4.5-bin-hadoop2.7.tgz) and 
+**NOTE**: [spark-3.0.1-bin-hadoop2.7.tgz](https://archive.apache.org/dist/spark/spark-3.0.1/spark-3.0.1-bin-hadoop2.7.tgz), 
+[spark-2.4.5-bin-hadoop2.7.tgz](https://archive.apache.org/dist/spark/spark-2.4.5/spark-2.4.5-bin-hadoop2.7.tgz), and 
 [spark-2.3.0-bin-hadoop2.7.tgz](https://archive.apache.org/dist/spark/spark-2.3.0/spark-2.3.0-bin-hadoop2.7.tgz) were tested to work fine.
 
-The examples in the rest of this section reference Spark 2.4.5 but the same are true for Spark 2.3.0 .
+The examples in the rest of this section reference Spark 2.4.5 but the same are true for Spark 3.0.1 and 2.3.0 .
 
 ```
 $ spark-shell --version
@@ -151,7 +160,7 @@ Url
 Type --help for more information.
 ```
 
-**TIP**: Make sure to use the proper versions of Apache Spark 2.4 (or 2.3), Scala 2.11, and Java 1.8.0.
+**TIP**: Make sure to use the proper versions of Java 1.8.0, and Apache Spark 3.0 with Scala 2.12 or Apache Spark 2.4 (or 2.3) with Scala 2.11.
 
 You should build the data source using `sbt assembly` command.
 
@@ -161,7 +170,8 @@ $ sbt assembly
 [success] Total time: 49 s, completed Feb 21, 2020 1:05:51 PM
 ```
 
-You should have the connector assembled as `target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar`.
+You should have the connector assembled as `target/scala-2.11/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar` or 
+for Spark 3.0 `target/scala-2.12/splice-machine-spark-connector-assembly-0.3.0-SNAPSHOT.jar`.
 
 **NOTE**: Start Splice Machine, e.g. `./start-splice-cluster -p cdh6.3.0 -bl`.
 
@@ -180,7 +190,7 @@ splice> insert into t1 values (0, 'The connector works!');
 1 row inserted/updated/deleted
 ```
 
-**NOTE** Make sure you use `spark-2.4.5-bin-hadoop2.7`, `spark-2.3.0-bin-hadoop2.7`, or compatible.
+**NOTE** Make sure you use `spark-3.0.1-bin-hadoop2.7`, `spark-2.4.5-bin-hadoop2.7`, `spark-2.3.0-bin-hadoop2.7`, or compatible.
 
 ```
 // You should be using ASSEMBLY jar
@@ -191,7 +201,7 @@ $ spark-shell \
 val compatibleSparkVersion = "2.4.5"
 assert(
     spark.version == compatibleSparkVersion,
-    s"The connector works just fine with Spark $compatibleSparkVersion")
+    s"Using Spark version ${spark.version}, expected $compatibleSparkVersion")
 
 val user = "splice"
 val password = "admin"
@@ -318,9 +328,11 @@ spark-shell \
 
 The demo uses `t1` topic with a Kafka broker listening to `9092` port. The name of the splice table is `kafka`.
 
-This demo works in Spark 2.4, which supports the foreachBatch function.
+This demo works in Spark 2.4 and greater, versions which support the foreachBatch function.
 
 ```
+import org.apache.spark.sql._
+
 val values = spark
   .readStream
   .format("kafka")
@@ -372,6 +384,7 @@ The next demo works in Spark 2.0 and greater.
 ```
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.SparkContext
+import org.apache.spark.sql._
 import com.splicemachine.spark2.splicemachine.SplicemachineContext
 
 val values = spark
@@ -386,12 +399,13 @@ assert(values.isStreaming)
 
 val user = "splice"
 val password = "admin"
-val url = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
+val jdbcUrl = s"jdbc:splice://localhost:1527/splicedb;user=$user;password=$password"
+val tableName = "kafka"
 
-val sq = values
+val strQuery = values
     .writeStream
-    .option("checkpointLocation", s"target/checkpointLocation-$tableName-${UUID.randomUUID()}")
-    .trigger(Trigger.ProcessingTime(1.second))
+    .option("checkpointLocation", s"target/checkpointLocation-$tableName-${java.util.UUID.randomUUID()}")
+    .trigger(Trigger.ProcessingTime("1 second"))
     .foreach(
       new ForeachWriter[Row] {
         var spliceCtx: SplicemachineContext = _
@@ -407,7 +421,7 @@ val sq = values
           spliceCtx.insert(
             sparkContext.parallelize(Seq(record)),
             record.schema,
-            table
+            tableName
           )
     
         def close(errorOrNull: Throwable): Unit = {}
