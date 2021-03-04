@@ -1,12 +1,10 @@
 name := "splice-machine-spark-connector"
 
-version := "0.3.0-SNAPSHOT"
+val spliceVersion = "3.2.0.1980-SNAPSHOT"
+
+version := spliceVersion
 
 scalaVersion := "2.11.12"
-
-//val spliceVersion = "2.8.0.1945"
-//val spliceVersion = "3.1.0.1967-SNAPSHOT"
-val spliceVersion = "3.2.0.1980-SNAPSHOT"
 
 // https://github.com/sbt/sbt/issues/5046
 ThisBuild / useCoursier := false
