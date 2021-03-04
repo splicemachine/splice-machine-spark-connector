@@ -42,7 +42,7 @@ public class KafkaTopicProducer {
         kp.server = args[0];
         kp.topic = args[1];
         kp.totalEvents = Long.parseLong(args[2]);
-	kp.run(Long.parseLong(args[3]));
+        kp.run(Long.parseLong(args[3]));
     }
 
     public void run(Long threadCount) {
