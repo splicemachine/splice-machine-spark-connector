@@ -80,7 +80,7 @@ class Loader(
             if( sparkExp.toString.contains("java.util.ConcurrentModificationException: KafkaConsumer is not safe for multi-threaded access") ) {
               Thread.sleep(1000)
               log(s"$id LOAD retry to $topicName")
-              nsds.sendData_streaming(df, topicName, kafkaRecovery = true)
+              nsds.sendData_streaming(df, topicName)  // TODO support kafkaRecovery = true
             } else {
               throw sparkExp
             }
