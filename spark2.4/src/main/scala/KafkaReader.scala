@@ -24,7 +24,7 @@ object KafkaReader {
     val appName = args(0)
     val externalKafkaServers = args(1)
     val externalTopic = args(2)
-    val schemaDDL = args(3)
+    var schemaDDL = args(3)
     val spliceUrl = args(4)
     val spliceTable = args(5)
     val spliceKafkaServers = args.slice(6,7).headOption.getOrElse("localhost:9092")
@@ -51,9 +51,16 @@ object KafkaReader {
     // Create schema from ddl string like
     //    "ID STRING NOT NULL, LOCATION STRING, TEMPERATURE DOUBLE, HUMIDITY DOUBLE, TM TIMESTAMP"
     var schema = new StructType
+    var splitter = " "
+    var notNull = "NOT NULL"
+    if( schemaDDL.trim.startsWith(".") ) {
+      schemaDDL = schemaDDL.trim.substring(1, schemaDDL.length)
+      splitter = "[.]"
+      notNull = "NOT.NULL"
+    }
     schemaDDL.split(",").foreach{ s =>
-      val f = s.trim.split(" ")
-      schema = schema.add( f(0) , f(1) , ! s.toUpperCase.contains("NOT NULL") )
+      val f = s.trim.split(splitter)
+      schema = schema.add( f(0) , f(1) , ! s.toUpperCase.contains(notNull) )
     }
 
 //    val schema = new SplicemachineContext(spliceUrl, externalKafkaServers).getSchema(spliceTable)
