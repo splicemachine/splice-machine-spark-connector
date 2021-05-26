@@ -1,0 +1,6 @@
+pyspark-dist-explore==0.1.8
+sk-dist==0.1.6
+numpy==1.17.4
+mleap==0.15.0
+pyarrow==0.16.0
+h2o-pysparkling-2.4==3.28.1.2-1
