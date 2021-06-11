@@ -102,7 +102,7 @@ class Loader(
         taskQueue.put((lastRows, newTotal, topicInfo))
       } catch {
         case e: Throwable =>
-          logger.error(s"$id LOAD ERROR Load failed\n$e")
+          logger.error(s"$id LOAD ERROR Load failed\n$e\n${e.getMessage}\n${e.printStackTrace}")
 //          e.printStackTrace
       }
     } while(processing.get)

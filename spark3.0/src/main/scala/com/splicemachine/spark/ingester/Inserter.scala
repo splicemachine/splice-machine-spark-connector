@@ -22,6 +22,7 @@ class Inserter(
     useFlowMarkers: Boolean,
     spliceTable: String, 
     dfSchema: StructType,
+    upsert: Boolean = false,
     taskQueue: BlockingQueue[(Seq[RowForKafka], Long, String)],
     batchCountQueue: BlockingQueue[Long],
     processing: AtomicBoolean,
@@ -38,7 +39,7 @@ class Inserter(
     "USE_FLOW_MARKERS" -> useFlowMarkers.toString
   ))
   
-  nsds.setTable(spliceTable, dfSchema)
+  nsds.setTable(spliceTable, dfSchema, upsert)
 
   val log: String => Unit = (s: String) => if (loggingOn) { logger.info(s) }
 

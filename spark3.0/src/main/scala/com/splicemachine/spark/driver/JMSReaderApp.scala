@@ -135,6 +135,7 @@ object JMSReaderApp {
       "transaction_table",
       "localhost:9092",
       1,  // equal to number of partition in DataFrame?
+      false, // upsert: Boolean
       true  // loggingOn: Boolean
     )
 
@@ -144,6 +145,7 @@ object JMSReaderApp {
       "exception_table",
       "localhost:9092",
       1,  // equal to number of partition in DataFrame?
+      false, // upsert: Boolean
       true  // loggingOn: Boolean
     )
     

@@ -27,6 +27,7 @@ assemblyMergeStrategy in assembly := {
   case PathList("javax", "annotation", _*)  => MergeStrategy.first
   case PathList("google", "protobuf", _*)  => MergeStrategy.first
   case "module-info.class" => MergeStrategy.discard
+  case "log4j.properties" => MergeStrategy.discard
   case x =>
     val oldStrategy = (assemblyMergeStrategy in assembly).value
     oldStrategy(x)
@@ -35,6 +36,7 @@ assemblyMergeStrategy in assembly := {
 // FIXME There has to be a better way to exclude all the jars (!)
 assemblyExcludedJars in assembly := {
   val excludedDeps = Set(
+    "log4j.properties",
     // Conflicts with splice_aws-2.8.0.1926-shade.jar
     "aws-java-sdk-bundle-1.11.134.jar",
     "aws-java-sdk-kms-1.11.82.jar",

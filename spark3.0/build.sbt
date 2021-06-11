@@ -38,16 +38,19 @@ kafkaVersion := s"2.2.1-${distro.value}"
 // java.lang.NoClassDefFoundError: com/splicemachine/access/HConfiguration
 // https://stackoverflow.com/a/46763742/1305344
 
-val excludedDeps = Seq(
+val excludedDepsNonSpark = Seq(
   ExclusionRule(organization = "org.xerial.snappy", name = "snappy-java"),
   ExclusionRule(organization = "tomcat", name = "jasper-compiler"),
-  // FIXME Somehow 2.2.0 is pulled down
-  ExclusionRule(organization = "org.apache.spark"),
   // Added later separately
   ExclusionRule(organization = "com.splicemachine", name = "scala_util"),
   ExclusionRule(organization = "javax.ws.rs", name = "javax.ws.rs-api"),
   ExclusionRule(organization = "org.apache.kafka", name = "kafka_2.11"),
   ExclusionRule(organization = "org.scala-lang.modules", name = "scala-parser-combinators_2.11")
+)
+
+val excludedDeps = excludedDepsNonSpark ++ Seq(
+  // FIXME Somehow 2.2.0 is pulled down
+  ExclusionRule(organization = "org.apache.spark"),
 )
 
 libraryDependencies ++= Seq(
@@ -91,6 +94,7 @@ libraryDependencies += "org.apache.hbase" % "hbase-hadoop-compat" % hbaseVersion
 libraryDependencies += "org.apache.hbase" % "hbase-zookeeper" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-mapreduce" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.kafka" % "kafka_2.12" % kafkaVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.spark" % "spark-sql-kafka-0-10_2.12" % sparkVersion.value excludeAll (excludedDepsNonSpark: _*)
 libraryDependencies += "org.scala-lang.modules" % "scala-parser-combinators_2.12" % "1.1.2" excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.activemq" % "activemq-all" % "5.12.0" excludeAll (excludedDeps: _*)
 libraryDependencies += "com.rabbitmq.jms" % "rabbitmq-jms" % "1.11.0" excludeAll (excludedDeps: _*)

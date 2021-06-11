@@ -24,6 +24,7 @@ class SLIIngester extends Ingester {  // Serial Loader Inserter == SLI
     spliceTableName: String,
     spliceKafkaServers: String,
     spliceKafkaPartitions: Int,  // equal to number of partition in DataFrame
+    upsert: Boolean = false,
     loggingOn: Boolean = false,
     useFlowMarkers: Boolean = false  // for diagnostic use
   ) {
@@ -67,6 +68,7 @@ class SLIIngester extends Ingester {  // Serial Loader Inserter == SLI
           useFlowMarkers,
           spliceTableName,
           schema,
+          upsert,
           taskQueue,
           batchCountQueue,
           processing,

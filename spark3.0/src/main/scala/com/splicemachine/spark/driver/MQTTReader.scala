@@ -61,11 +61,11 @@ object MQTTReader {
     val values = spark
       .readStream
       .format("org.apache.bahir.sql.streaming.mqtt.MQTTStreamSourceProvider")
-      .option("topic", "FD01")
-      .option("clientId", "1")
+      .option("topic", externalTopic)  // "FD01"
+      .option("clientId", mqttClientId)  // "1"
       .option("persistence", "memory")
-      .load("tcp://localhost:1883")
-      .select($"payload" cast "string")
+      .load(externalMQTTServer)  // "tcp://localhost:1883"
+//      .select($"payload" cast "string")
 
 //    .select(from_json($"payload" cast "string", schema) as "data").select("data.*")
 //      .select($"payload" cast "string").as[String]
@@ -90,6 +90,7 @@ object MQTTReader {
       spliceTable,
       spliceKafkaServers,
       spliceKafkaPartitions.toInt,  // equal to number of partition in DataFrame
+      false, // upsert: Boolean
       true,  // loggingOn: Boolean
       useFlowMarkers
     )
