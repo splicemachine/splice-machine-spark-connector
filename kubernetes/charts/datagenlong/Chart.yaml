@@ -1,0 +1,9 @@
+apiVersion: v1
+appVersion: 0.0.1
+description: SSDS Data Generator, continues sending data until killed
+maintainers:
+- email: jpanko@splicemachine.com
+  name: Joe Panko
+name: kafkaproducer
+version: 0.0.1
+

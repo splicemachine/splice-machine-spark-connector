@@ -1,0 +1,84 @@
+# Values for Running Application
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+#Set the docker version of kafka conumer here
+image:
+  name: jpanko/ssds_datagenlong
+  tag:  '0.0.1'
+
+
+# Details of the Spark Job to run
+job:
+#  appjar: "/opt/app/jars/splice-adapter-kafka-streaming-1.0-SNAPSHOT-jar-with-dependencies.jar"
+#  classname: "KafkaReader"
+
+  #Specify the argument to pass to the spark application. The values are space separated with double quotes
+  #around values so that has special characters will not result in errors
+
+  # use this for jdbcurl after replacing replace DB_CLUSTER_NAME  DB_USER and DB_PASSWORD
+  #"jdbc:splice://splicedb-hregion.DB_CLUSTER_NAME.svc.cluster.local:1527/splicedb;user=DB_USER;password=DB_PASSWORD;"
+
+  #use this for sp;lice kafka, after replacing the DB_CLUSTER_NAME
+  #"splicedb-kafka.DB_CLUSTER_NAME.svc.cluster.local:9092"
+
+  #For current application the args required are
+  # "KAFKA_BROKER" "TOPIC" "NUM_RECORDS per batch" "NUM_THREADS" "Sleep time (ms) between batches"
+#  appargs: splicedb-kafka-0.splicedb-kafka-headless.jp201102.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.jp201102.svc.cluster.local:9092  perf1 9000000 3   # 6*3*9M = 162M
+#  appargs: splicedb-kafka-0.splicedb-kafka-headless.jp201102.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.jp201102.svc.cluster.local:9092  perf1 56000000 3   # 6*3*56M = 1.008 B
+#  appargs: splicedb-kafka-0.splicedb-kafka-headless.jp201009.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.jp201009.svc.cluster.local:9092  perf1 75000000 3  # 6*3*75M = 1.35B
+#  appargs: splicedb-kafka-0.splicedb-kafka-headless.jp201009.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.jp201009.svc.cluster.local:9092 perf1 10000000 2
+#  appargs: splicedb-kafka-0.splicedb-kafka-headless.db.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.db.svc.cluster.local:9092,splicedb-kafka-2.splicedb-kafka-headless.db.svc.cluster.local:9092  perf1 24000000 2
+#  appargs: splicedb-kafka-0.splicedb-kafka-headless.db.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.db.svc.cluster.local:9092,splicedb-kafka-2.splicedb-kafka-headless.db.svc.cluster.local:9092  perf1 6000000 3
+#  appargs: splicedb-kafka-0.splicedb-kafka-headless.db11.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.db11.svc.cluster.local:9092,splicedb-kafka-2.splicedb-kafka-headless.db11.svc.cluster.local:9092  perf1 22000000 3
+  appargs: splicedb-kafka-0.splicedb-kafka-headless.db1.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.db1.svc.cluster.local:9092  perf1 1000 1 1000
+
+#,splicedb-kafka-2.splicedb-kafka-headless.jp200918.svc.cluster.local:9092
+
+#splicedb-kafka.jp200826.svc.cluster.local:9092
+
+  appname: "ssds-kafkaproducer"
+#  packageslist: org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5,org.apache.kafka:kafka-clients:2.2.1
+
+
+  # Below are values to run the example pi
+  #appjar: "/opt/spark/examples/jars/spark-examples_2.11-2.4.5.jar"
+  #classname: "org.apache.spark.examples.SparkPi"
+  #appargs: ""
+  #appname: "piexample"
+
+#  spark_image: jpanko/kafka_spark_dev:0.0.1
+#  spark_executor_memory: "4G"
+#  spark_executor_cores: "5"
+#  spark_executor_count: "2"
+
+#Set this to true, if you need the pod to not terminate upon finishing the job, so you can log in and debug
+debug: true
+
+
+replicaCount: 1
+
+nameOverride: kafkaproducer
+name: kafkaproducer
+restartPolicy: Never
+
+imagePullPolicy: IfNotPresent
+
+## Annotations passed to operator pod(s).
+##
+annotations: {}
+
+resources: {}
+
+
+serviceAccountName: default
+
+nodeselectorLabel: meta
+
+
+
+
+
+
+
