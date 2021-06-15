@@ -106,6 +106,15 @@ object KafkaReaderApp2 {
       reader.option("kafka.group.id", group)
       reader.option("kafka.client.id", s"$group-$clientId")  // probably should use uuid instead of user input TODO
     }
+    
+    val dbSchema = StructType(Seq(
+      StructField("FULL_TAG_NAME", StringType),
+      StructField("START_TS", TimestampType),
+      StructField("END_TS", TimestampType),
+      StructField("TIME_WEIGHTED_VALUE", DoubleType),
+      StructField("VALUE_STATE", StringType),
+      StructField("QUALITY", IntegerType)
+    ))
 
     val windowSize = 60
     val windowSizeUnits = "seconds" 
@@ -179,9 +188,10 @@ object KafkaReaderApp2 {
         }
         //(tag, v.mkString("|"))
         //tag
-        res.result
+        res.result.map(r => Row(r.fullTagName, r.wndStart, r.wndEnd, r.twa, r.valueState, r.quality))
 //        wnData.result
-      }).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
+      }) (RowEncoder(dbSchema))
+//      .toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
 //      }).toDF("FULLTAGNAME","TIME","DELTA","VALUE","QUALITY","VALUE_STATE")
 //    (RowEncoder(
 //          StructType(Seq(
@@ -208,6 +218,7 @@ object KafkaReaderApp2 {
         .select("data.*")
         .withWatermark("TIME", s"$watermarkThreshold $windowSizeUnits")
         .transform(xform)
+        .coalesce(spliceKafkaPartitions.toInt)
 //        .groupBy(
 //          window($"TIME", s"$windowSize $windowSizeUnits"),
 //          $"FULLTAGNAME"
@@ -236,14 +247,7 @@ object KafkaReaderApp2 {
     val ingester = new SLIIngester(
       numLoaders,
       numInserters,
-      StructType(Seq(
-        StructField("FULL_TAG_NAME", StringType),
-        StructField("START_TS", TimestampType),
-        StructField("END_TS", TimestampType),
-        StructField("TIME_WEIGHTED_VALUE", DoubleType),
-        StructField("VALUE_STATE", StringType),
-        StructField("QUALITY", IntegerType)
-      )),
+      dbSchema,
       spliceUrl,
       spliceTable,
       spliceKafkaServers,
@@ -253,29 +257,34 @@ object KafkaReaderApp2 {
       useFlowMarkers
     )
 
-    def processBatch(df: DataFrame, batchId: Long): Unit = {
-      df
-        //        .orderBy(asc("TIME"))
-        //        .groupByKey(row => (row.getAs[String]("FULLTAGNAME")))
-        //        .map(row => (row.getAs[String]("FULLTAGNAME"), (row.getAs[Timestamp]("TIME"), row.getAs[Double]("VALUE"))))
-        //        .orderBy("window")
-        .show(false)
-      //df.filter(r => r.getAs[String]("VALUE_STATE").equals("F")).show(150, false)
-      ingester.ingest(df)
-    }
+//    def processBatch(df: DataFrame, batchId: Long): Unit = {
+//      df
+//        //        .orderBy(asc("TIME"))
+//        //        .groupByKey(row => (row.getAs[String]("FULLTAGNAME")))
+//        //        .map(row => (row.getAs[String]("FULLTAGNAME"), (row.getAs[Timestamp]("TIME"), row.getAs[Double]("VALUE"))))
+//        //        .orderBy("window")
+//        .show(false)
+//      //df.filter(r => r.getAs[String]("VALUE_STATE").equals("F")).show(150, false)
+//      ingester.ingest(df)
+//    }
 
     val strQuery = values
       .writeStream
-      .outputMode("append")
+//      .outputMode("append")
       .option("checkpointLocation",s"/tmp/checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
 //      .trigger(Trigger.ProcessingTime(s"$windowSize $windowSizeUnits"))
       .foreachBatch {
         (batchDF: DataFrame, batchId: Long) => try {
           log.info(s"transfer next batch")
-//          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
-//          ingester.ingest(batchDF)
 
-          processBatch(batchDF, batchId)
+//          batchDF.persist
+//          batchDF.show(false)
+          
+//          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
+          ingester.ingest(batchDF)
+          
+//          processBatch(batchDF, batchId)
+//          batchDF.unpersist
 
 //          println(s"${java.time.Instant.now} transferred batch having ${batchDF.count}")  // todo log count as trace or diagnostic
           log.info(s"transferred batch")
