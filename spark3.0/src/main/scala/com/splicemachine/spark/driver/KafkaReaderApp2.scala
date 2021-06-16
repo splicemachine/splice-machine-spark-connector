@@ -21,6 +21,7 @@ import org.apache.kafka.common.serialization.LongSerializer
 import org.apache.log4j.Logger
 import com.spicemachine.spark.ingester.SLIIngester
 
+case class InputData(fullTagName: String, tagName: String, time: Timestamp, value: Double, quality: Int)
 case class DeltaData(endTime: Timestamp, delta: Long, value: Double, quality: Int, valueState: String)
 //case class DeltaDataTail(endTime: Timestamp, delta: Long, value: Double, quality: Int, valueState: String, window: Window)
 case class ResultData(fullTagName: String, wndStart: Timestamp, wndEnd: Timestamp, twa: Double, valueState: String, quality: Int)
@@ -54,11 +55,12 @@ object KafkaReaderApp2 {
 
     // Recommended when using stateful stream queries, based on
     //  https://docs.databricks.com/spark/latest/structured-streaming/production.html#optimize-performance-of-stateful-streaming-queries
-    spark.conf.set(
-      "spark.sql.streaming.stateStore.providerClass",
-      "com.databricks.sql.streaming.state.RocksDBStateStoreProvider"
-    )
-
+//    spark.conf.set(
+//      "spark.sql.streaming.stateStore.providerClass",
+//      "com.databricks.sql.streaming.state.RocksDBStateStoreProvider"
+//    )
+// TODO add RocksDB jar
+    
     // Create schema from ddl string like
     //    "ID STRING NOT NULL, LOCATION STRING, TEMPERATURE DOUBLE, HUMIDITY DOUBLE, TM TIMESTAMP"
     // or ".ID.LONG.NOT.NULL,PAYLOAD.STRING,SRC_SERVER.STRING.NOT.NULL,SRC_THREAD.LONG,TM_GENERATED.LONG.NOT.NULL"
@@ -117,9 +119,10 @@ object KafkaReaderApp2 {
     ))
 
     val windowSize = 60
-    val windowSizeUnits = "seconds" 
-    val watermarkThreshold = 2 * windowSize
+    val windowSizeUnits = "seconds"
     val windowMs = windowSize * 1000
+    val watermarkThreshold = 2 * windowSize
+    val watermarkThresholdUnits = windowSizeUnits
 
 //    Input format:
 //    {"FULLTAGNAME":"OCIB.Kep.FFIC731.PV", "TAGNAME":"FFIC731.PV", "TIME":
@@ -144,29 +147,54 @@ object KafkaReaderApp2 {
     def wnResults(tag: String, curWindow: (Timestamp,Timestamp), wnData: Seq[DeltaData]): ResultData =
       new ResultData(tag, curWindow._1, curWindow._2, twa(wnData), wnState(wnData), wnQuality(wnData))
 
-    def xform(df: DataFrame): DataFrame = df
-      .groupByKey(row => (row.getAs[String]("FULLTAGNAME")))
+    def xform(df: Dataset[InputData]): DataFrame = df
+//      .groupByKey(row => (row.getAs[String]("FULLTAGNAME")))
+      .groupByKey(input => input.fullTagName)
 //      .groupBy(
 //        window($"TIME", s"$windowSize $windowSizeUnits"),
 //        $"FULLTAGNAME"
 //      ) //.as[String,IncomingTail]
-//      .flatMapGroupsWithState((tag,valItr,state) => {
-      .flatMapGroups((tag,valItr) => {
-        val sortedSeq = valItr.toSeq.sortWith((r1, r2) => r1.getTimestamp(2).before(r2.getTimestamp(2)))
-        val itr = sortedSeq.iterator
+      .flatMapGroupsWithState(OutputMode.Append, GroupStateTimeout.NoTimeout)((tag: String, valItr: Iterator[InputData], state: GroupState[Seq[InputData]]) => {
+//      .flatMapGroups((tag,valItr) => {
+        //val prevStateOpt = state.getOption
+        def sortByTime(r1: InputData, r2: InputData): Boolean = r1.time.before(r2.time)
+//        val newState = valItr.toSeq.sortWith((r1, r2) => r1.getTimestamp(2).before(r2.getTimestamp(2)))
+        val newState = valItr.toSeq.sortWith(sortByTime)
+        val itr = if(state.exists) {
+          val prevState = state.get.sortWith(sortByTime)
+          val (wnStart, wnEnd) = windowOf(newState(0).time.getTime)
+          val inScope = prevState.dropWhile(_.time.before(wnStart))
+          val inScopeFromWnStart = if(
+            inScope.size == prevState.size
+            || inScope.exists(! _.time.after(wnStart))
+            || newState.exists(! _.time.after(wnStart)) )
+          {
+            inScope
+          } else {
+            val lastRecBeforeWnStart = prevState(prevState.size - inScope.size - 1)
+            new InputData(lastRecBeforeWnStart.fullTagName, lastRecBeforeWnStart.tagName, wnStart,
+              lastRecBeforeWnStart.value, lastRecBeforeWnStart.quality) +: inScope
+          }
+          (inScopeFromWnStart ++ newState).sortWith(sortByTime).iterator
+        } else {
+          newState.iterator
+        }
+//         val itr = newState.iterator
+        state.update(newState)
+        //state.update(Seq(Row("Array.empty[Byte]"),Row("Array.empty[Byte]")))
         val res = Seq.newBuilder[ResultData]
         val wnData = Seq.newBuilder[DeltaData]
         if (itr.hasNext) {
           var prev = itr.next
           //println(prev)
           //println(prev.getClass.getName)
-          var prevTime = prev.getAs[Timestamp]("TIME").getTime
-          var prevValue = prev.getAs[Double]("VALUE")
-          var prevQuality = prev.getAs[Int]("QUALITY")
+          var prevTime = prev.time.getTime
+          var prevValue = prev.value
+          var prevQuality = prev.quality
           var (nextWndEnd, nextWndStart) = nextWindowCut( prevTime )
           for (cur <- itr) {
             //println(cur)
-            val curTime = cur.getAs[Timestamp]("TIME").getTime
+            val curTime = cur.time.getTime
             while( curTime >= nextWndStart ) {
               wnData += new DeltaData(new Timestamp(nextWndEnd), (nextWndStart-prevTime), prevValue, prevQuality, "F")
               res += wnResults(tag, windowOf(prevTime), wnData.result)
@@ -178,8 +206,8 @@ object KafkaReaderApp2 {
             }
             wnData += new DeltaData(new Timestamp(curTime), (curTime-prevTime), prevValue, prevQuality, "A")
             prevTime = curTime
-            prevValue = cur.getAs[Double]("VALUE")
-            prevQuality = cur.getAs[Int]("QUALITY")
+            prevValue = cur.value
+            prevQuality = cur.quality
           }
           wnData += new DeltaData(new Timestamp(nextWndEnd), (nextWndStart-prevTime), prevValue, prevQuality, "F")
           res += wnResults(tag, windowOf(prevTime), wnData.result)
@@ -188,9 +216,14 @@ object KafkaReaderApp2 {
         }
         //(tag, v.mkString("|"))
         //tag
-        res.result.map(r => Row(r.fullTagName, r.wndStart, r.wndEnd, r.twa, r.valueState, r.quality))
+        res.result.map(r => (r.fullTagName, r.wndStart, r.wndEnd, r.twa, r.valueState, r.quality)).iterator
 //        wnData.result
-      }) (RowEncoder(dbSchema))
+      }).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
+    
+//    (RowEncoder(schema), RowEncoder(dbSchema))
+
+//    (RowEncoder(StructType(Seq(
+//        StructField("state", StringType)))), RowEncoder(dbSchema))
 //      .toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
 //      }).toDF("FULLTAGNAME","TIME","DELTA","VALUE","QUALITY","VALUE_STATE")
 //    (RowEncoder(
@@ -216,7 +249,8 @@ object KafkaReaderApp2 {
       reader
         .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-ddTHH:mm:ss.SSSZ" )) as "data")
         .select("data.*")
-        .withWatermark("TIME", s"$watermarkThreshold $windowSizeUnits")
+        .withWatermark("TIME", s"$watermarkThreshold $watermarkThresholdUnits")
+        .as[InputData]
         .transform(xform)
         .coalesce(spliceKafkaPartitions.toInt)
 //        .groupBy(
