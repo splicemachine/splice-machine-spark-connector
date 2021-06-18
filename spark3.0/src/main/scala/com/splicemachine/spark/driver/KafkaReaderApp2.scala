@@ -40,13 +40,15 @@ object KafkaReaderApp2 {
     val numLoaders = args.slice(8,9).headOption.getOrElse("1").toInt
     val numInserters = args.slice(9,10).headOption.getOrElse("1").toInt
     val startingOffsets = args.slice(10,11).headOption.getOrElse("latest")
-    val upsert = args.slice(11,12).headOption.getOrElse("false").toBoolean
-    val dataTransformation = args.slice(12,13).headOption.getOrElse("false").toBoolean
-    val tagFilename = args.slice(13,14).headOption.getOrElse("")
-    val useFlowMarkers = args.slice(14,15).headOption.getOrElse("false").toBoolean
-    val maxPollRecs = args.slice(15,16).headOption
-    val groupId = args.slice(16,17).headOption.getOrElse("")
-    val clientId = args.slice(17,18).headOption.getOrElse("")
+    val checkpointLocationRootDir = args.slice(11,12).headOption.getOrElse("/tmp")
+    val upsert = args.slice(12,13).headOption.getOrElse("false").toBoolean
+    val eventFormat = args.slice(13,14).headOption.getOrElse("flat")
+    val dataTransformation = args.slice(14,15).headOption.getOrElse("false").toBoolean
+    val tagFilename = args.slice(15,16).headOption.getOrElse("")
+    val useFlowMarkers = args.slice(16,17).headOption.getOrElse("false").toBoolean
+    val maxPollRecs = args.slice(17,18).headOption
+    val groupId = args.slice(18,19).headOption.getOrElse("")
+    val clientId = args.slice(19,20).headOption.getOrElse("")
 
     val log = Logger.getLogger(getClass.getName)
 
@@ -273,10 +275,10 @@ object KafkaReaderApp2 {
         .withColumn("TM_SSDS", unix_timestamp * 1000 )
     } else {
       reader
-        .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-ddTHH:mm:ss.SSSZ" )) as "data")
-//        .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-dd HH:mm:ss.SSSSSS" )) as "data")
+//        .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-ddTHH:mm:ss.SSSZ" )) as "data")
+        .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-dd HH:mm:ss.SSSSSS" )) as "data")
         .select("data.*")
-//        .selectExpr("TAG as fullTagName", "TAG as tagName", "SERVERTIME as time", "VALUE as value", "STATUS as quality")
+        .selectExpr("TAG as fullTagName", "TAG as tagName", "SERVERTIME as time", "VALUE as value", "STATUS as quality")
         .withWatermark("time", s"$watermarkThreshold $watermarkThresholdUnits")
         .as[InputData]
         .transform(timeWeightedAverage)  // ("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
@@ -338,17 +340,19 @@ object KafkaReaderApp2 {
 //      ingester.ingest(df)
 //    }
 
+    val chkpntRoot = checkpointLocationRootDir + (if(!checkpointLocationRootDir.endsWith("/")) { "/" } else {""})
+    
     val tsFormatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
     var prevLastFinishWn = Timestamp.from(java.time.Instant.now)
     var lastFinishWn = Timestamp.from(java.time.Instant.now)
     var firstPublish = true
-    val jsonStart = "{\"ResampledEvent\": \""
-    val jsonEnd = "\"}"
+    val eventStart = if(eventFormat.equalsIgnoreCase("json")) { "{\"ResampledEvent\": \"" } else {""}
+    val eventEnd = if(eventFormat.equalsIgnoreCase("json")) { "\"}" } else {""}
 
     val strQuery = values
       .writeStream
 //      .outputMode("append")
-      .option("checkpointLocation",s"/tmp/checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
+      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
 //      .trigger(Trigger.ProcessingTime(s"$windowSize $windowSizeUnits"))
       .foreachBatch {
         (batchDF: DataFrame, batchId: Long) => try {
@@ -377,7 +381,7 @@ object KafkaReaderApp2 {
               val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
               kafkaProducer.send(new ProducerRecord(
                 resampledEventTopic,
-                s"$jsonStart${tsFormatter.format(lastFinishWn).toString}$jsonEnd"
+                s"$eventStart${tsFormatter.format(lastFinishWn).toString}$eventEnd"
               ))
               prevLastFinishWn = lastFinishWn
             } else {
