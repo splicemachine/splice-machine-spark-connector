@@ -17,12 +17,12 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.IntegerSerializer
-import org.apache.kafka.common.serialization.LongSerializer
+import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.log4j.Logger
 import com.spicemachine.spark.ingester.SLIIngester
 
-case class InputData(fullTagName: String, tagName: String, time: Timestamp, value: Double, quality: Int)
-case class DeltaData(endTime: Timestamp, delta: Long, value: Double, quality: Int, valueState: String)
+case class InputData(fullTagName: String, tagName: String, time: Timestamp, value: String, quality: String)
+case class DeltaData(endTime: Timestamp, delta: Long, value: String, quality: String, valueState: String)
 //case class DeltaDataTail(endTime: Timestamp, delta: Long, value: Double, quality: Int, valueState: String, window: Window)
 case class ResultData(fullTagName: String, wndStart: Timestamp, wndEnd: Timestamp, twa: Double, valueState: String, quality: Int)
 
@@ -57,9 +57,9 @@ object KafkaReaderApp2 {
     //  https://docs.databricks.com/spark/latest/structured-streaming/production.html#optimize-performance-of-stateful-streaming-queries
 //    spark.conf.set(
 //      "spark.sql.streaming.stateStore.providerClass",
-//      "com.databricks.sql.streaming.state.RocksDBStateStoreProvider"
+//      "org.apache.spark.sql.execution.streaming.state.RocksDbStateStoreProvider"
+//      // pass com.qubole.spark:spark-rocksdb-state-store_2.11:1.0.0 in the packages param in spark-submit
 //    )
-// TODO add RocksDB jar
     
     // Create schema from ddl string like
     //    "ID STRING NOT NULL, LOCATION STRING, TEMPERATURE DOUBLE, HUMIDITY DOUBLE, TM TIMESTAMP"
@@ -77,21 +77,25 @@ object KafkaReaderApp2 {
       schema = schema.add( f(0) , f(1) , ! s.toUpperCase.contains(notNull) )
     }
     log.info(s"schema: $schema")
-
-//    val schema = new SplicemachineContext(spliceUrl, externalKafkaServers).getSchema(spliceTable)
-
-//    val smcParams = Map(
-//      "url" -> spliceUrl,
-//      "KAFKA_SERVERS" -> spliceKafkaServers,
-//      "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions
-//    )
-//
-//    val smc = new SplicemachineContext( smcParams )
-//
-//    if( ! smc.tableExists( spliceTable ) ) {
-//      smc.createTable( spliceTable , schema )
-//    }
     
+    val kafkaProducerProps = new Properties
+    kafkaProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, spliceKafkaServers)
+    kafkaProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[IntegerSerializer].getName)
+    kafkaProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[StringSerializer].getName)
+
+    val resampledEventTopic = "ResampledEvent"
+    
+//    {
+//      val smcParams = Map(
+//        "url" -> spliceUrl,
+//        "KAFKA_SERVERS" -> spliceKafkaServers,
+//        "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions
+//      )
+//
+//      val splice = new SplicemachineContext(smcParams)
+//      val tagLookup = splice.df("select * from OCI.TAGLOOKUPWITHIDENTITY").select("FULLTAGNAME", "TAG_TIMEOUT_SECONDS")
+//    }
+
     val reader = spark
       .readStream
       .format("kafka")
@@ -123,6 +127,7 @@ object KafkaReaderApp2 {
     val windowMs = windowSize * 1000
     val watermarkThreshold = 2 * windowSize
     val watermarkThresholdUnits = windowSizeUnits
+    val watermarkThresholdMs = watermarkThreshold * 1000
 
 //    Input format:
 //    {"FULLTAGNAME":"OCIB.Kep.FFIC731.PV", "TAGNAME":"FFIC731.PV", "TIME":
@@ -138,17 +143,25 @@ object KafkaReaderApp2 {
       (wndStart - 1, wndStart)
     }
     
-    def twa(wnData: Seq[DeltaData]): Double = wnData.map(d => d.delta * d.value / windowMs ).sum
+    def twa(wnData: Seq[DeltaData]): Double = wnData.map(d => {
+      try {
+        d.delta * d.value.toDouble / windowMs
+      } catch {
+        case e: Throwable => 0
+      }
+    }).sum
     
-    def wnQuality(wnData: Seq[DeltaData]): Int = wnData.map(_.quality).min
+    def wnQuality(wnData: Seq[DeltaData]): Int = wnData
+      .map(d => try{ d.quality.toInt } catch {
+        case e: Throwable => if(d.quality.toString.contains("StatusCode(Good)")) {192} else {0}
+      }).min
     
     def wnState(wnData: Seq[DeltaData]): String = if( wnData.map(_.valueState).contains("A") ) {"A"} else {"F"}
 
     def wnResults(tag: String, curWindow: (Timestamp,Timestamp), wnData: Seq[DeltaData]): ResultData =
       new ResultData(tag, curWindow._1, curWindow._2, twa(wnData), wnState(wnData), wnQuality(wnData))
 
-    def xform(df: Dataset[InputData]): DataFrame = df
-//      .groupByKey(row => (row.getAs[String]("FULLTAGNAME")))
+    def timeWeightedAverage(df: Dataset[InputData]): DataFrame = df
       .groupByKey(input => input.fullTagName)
 //      .groupBy(
 //        window($"TIME", s"$windowSize $windowSizeUnits"),
@@ -156,14 +169,20 @@ object KafkaReaderApp2 {
 //      ) //.as[String,IncomingTail]
       .flatMapGroupsWithState(OutputMode.Append, GroupStateTimeout.NoTimeout)((tag: String, valItr: Iterator[InputData], state: GroupState[Seq[InputData]]) => {
 //      .flatMapGroups((tag,valItr) => {
-        //val prevStateOpt = state.getOption
         def sortByTime(r1: InputData, r2: InputData): Boolean = r1.time.before(r2.time)
-//        val newState = valItr.toSeq.sortWith((r1, r2) => r1.getTimestamp(2).before(r2.getTimestamp(2)))
         val newState = valItr.toSeq.sortWith(sortByTime)
         val itr = if(state.exists) {
           val prevState = state.get.sortWith(sortByTime)
-          val (wnStart, wnEnd) = windowOf(newState(0).time.getTime)
-          val inScope = prevState.dropWhile(_.time.before(wnStart))
+          val (wnStart, wnEnd) = windowOf(newState.head.time.getTime - watermarkThresholdMs)
+          val (outOfScope, inScope) = prevState.span(_.time.before(wnStart))
+//          if( outOfScope.size > 0 ) {
+//            kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-"+java.util.UUID.randomUUID() )
+//            val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+//            outOfScope.map(d => windowOf(d.time.getTime)._1.toString).distinct.foreach(t => kafkaProducer.send(new ProducerRecord(
+//              resampledEventTopic,
+//              s"$tag,${t}"
+//            )))
+//          }
           val inScopeFromWnStart = if(
             inScope.size == prevState.size
             || inScope.exists(! _.time.after(wnStart))
@@ -175,13 +194,14 @@ object KafkaReaderApp2 {
             new InputData(lastRecBeforeWnStart.fullTagName, lastRecBeforeWnStart.tagName, wnStart,
               lastRecBeforeWnStart.value, lastRecBeforeWnStart.quality) +: inScope
           }
-          (inScopeFromWnStart ++ newState).sortWith(sortByTime).iterator
+          val combinedState = (inScopeFromWnStart ++ newState).sortWith(sortByTime)
+          state.update(combinedState)
+          combinedState.iterator
         } else {
+          state.update(newState)
           newState.iterator
         }
 //         val itr = newState.iterator
-        state.update(newState)
-        //state.update(Seq(Row("Array.empty[Byte]"),Row("Array.empty[Byte]")))
         val res = Seq.newBuilder[ResultData]
         val wnData = Seq.newBuilder[DeltaData]
         if (itr.hasNext) {
@@ -239,6 +259,12 @@ object KafkaReaderApp2 {
 //          ))
 //         ))
     //.toDF("fulltag", "tag", "time", "VALUE", "QUALITY")  //, "fields")
+    
+    // {"TAG": "ns=2;s=BLOCK1.BLOCK1.RandomTag426", "SERVERTIME": "2021-06-17 15:45:59.105702", 
+    //  "SOURCETIME": "2021-06-17 15:45:59.105702", "VALUE": 483, "STATUS": "StatusCode(Good)"}
+    //
+    //    {"FULLTAGNAME":"OCIB.Kep.FFIC731.PV", "TAGNAME":"FFIC731.PV", "TIME":
+    //      􏰀"2021-01-01T00:02:45.000Z", "VALUE":0.0065188, "QUALITY":192}
 
     val values = if (useFlowMarkers) {
       reader
@@ -248,11 +274,21 @@ object KafkaReaderApp2 {
     } else {
       reader
         .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-ddTHH:mm:ss.SSSZ" )) as "data")
+//        .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-dd HH:mm:ss.SSSSSS" )) as "data")
         .select("data.*")
-        .withWatermark("TIME", s"$watermarkThreshold $watermarkThresholdUnits")
+//        .selectExpr("TAG as fullTagName", "TAG as tagName", "SERVERTIME as time", "VALUE as value", "STATUS as quality")
+        .withWatermark("time", s"$watermarkThreshold $watermarkThresholdUnits")
         .as[InputData]
-        .transform(xform)
+        .transform(timeWeightedAverage)  // ("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
         .coalesce(spliceKafkaPartitions.toInt)
+
+//        .filter(r => {
+//          var nonDouble = false
+//          //try{ java.land.Double.valueOf( r.getAs[String]("value") ) } catch{ case e: Throwable => nonDouble = true }
+//          try{ r.getAs[String]("value").toDouble } catch{ case e: Throwable => nonDouble = true }
+//          nonDouble
+//        }).select("value")
+      
 //        .groupBy(
 //          window($"TIME", s"$windowSize $windowSizeUnits"),
 //          $"FULLTAGNAME"
@@ -302,6 +338,13 @@ object KafkaReaderApp2 {
 //      ingester.ingest(df)
 //    }
 
+    val tsFormatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    var prevLastFinishWn = Timestamp.from(java.time.Instant.now)
+    var lastFinishWn = Timestamp.from(java.time.Instant.now)
+    var firstPublish = true
+    val jsonStart = "{\"ResampledEvent\": \""
+    val jsonEnd = "\"}"
+
     val strQuery = values
       .writeStream
 //      .outputMode("append")
@@ -309,16 +352,42 @@ object KafkaReaderApp2 {
 //      .trigger(Trigger.ProcessingTime(s"$windowSize $windowSizeUnits"))
       .foreachBatch {
         (batchDF: DataFrame, batchId: Long) => try {
-          log.info(s"transfer next batch")
+          log.info(s"transfer next batch $batchId")
 
-//          batchDF.persist
-//          batchDF.show(false)
+          batchDF.persist
+          batchDF.show(false)
+          //batchDF.distinct.orderBy("value").show(false)
           
 //          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
           ingester.ingest(batchDF)
           
+          if(batchDF.count > 0) {
+            //println(lastFinishWn)
+            val minStart = batchDF.map(r => r.getAs[Timestamp]("START_TS"))
+              .reduce((t1, t2) => if (t1.before(t2)) {
+                t1
+              } else {
+                t2
+              })
+            lastFinishWn = windowOf(minStart.getTime-1)._1
+            //println(lastFinishWn)
+
+            if(!lastFinishWn.equals(prevLastFinishWn) && !firstPublish) {
+              kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
+              val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+              kafkaProducer.send(new ProducerRecord(
+                resampledEventTopic,
+                s"$jsonStart${tsFormatter.format(lastFinishWn).toString}$jsonEnd"
+              ))
+              prevLastFinishWn = lastFinishWn
+            } else {
+              firstPublish = false
+              prevLastFinishWn = lastFinishWn
+            }
+          }
+          
 //          processBatch(batchDF, batchId)
-//          batchDF.unpersist
+          batchDF.unpersist
 
 //          println(s"${java.time.Instant.now} transferred batch having ${batchDF.count}")  // todo log count as trace or diagnostic
           log.info(s"transferred batch")
