@@ -109,6 +109,8 @@ resolvers +=
     .withAllowInsecureProtocol(true)
 resolvers +=
   "cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
+resolvers +=
+  "Confluent Repository" at "https://packages.confluent.io/maven/"
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
 libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.10.0" force() excludeAll (excludedDeps: _*)
