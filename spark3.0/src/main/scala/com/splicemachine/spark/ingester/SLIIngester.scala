@@ -7,6 +7,9 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
 import org.apache.log4j.Logger
 
+import com.spicemachine.spark.ingester.component.LoadAnalyzer
+import com.spicemachine.spark.ingester.component.InsertCompleteAction
+
 import com.splicemachine.spark2.splicemachine.SplicemachineContext.RowForKafka
 
 class SLIIngester extends Ingester {  // Serial Loader Inserter == SLI
@@ -24,6 +27,8 @@ class SLIIngester extends Ingester {  // Serial Loader Inserter == SLI
     spliceTableName: String,
     spliceKafkaServers: String,
     spliceKafkaPartitions: Int,  // equal to number of partition in DataFrame
+    loadAnalyzer: Option[LoadAnalyzer],
+    onInsertCompletion: Option[InsertCompleteAction],
     upsert: Boolean = false,
     loggingOn: Boolean = false,
     useFlowMarkers: Boolean = false  // for diagnostic use
@@ -49,6 +54,7 @@ class SLIIngester extends Ingester {  // Serial Loader Inserter == SLI
           useFlowMarkers,
           dataQueue,
           taskQueue,
+          loadAnalyzer,
           batchRegulation,
           processing,
           loggingOn,
@@ -71,6 +77,7 @@ class SLIIngester extends Ingester {  // Serial Loader Inserter == SLI
           upsert,
           taskQueue,
           batchCountQueue,
+          onInsertCompletion,
           processing,
           loggingOn
         )

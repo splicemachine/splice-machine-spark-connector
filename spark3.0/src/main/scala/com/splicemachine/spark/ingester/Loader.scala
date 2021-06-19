@@ -7,6 +7,7 @@ import org.apache.log4j.Logger
 import org.apache.spark.sql.DataFrame
 import com.splicemachine.spark2.splicemachine.SplicemachineContext
 import com.splicemachine.spark2.splicemachine.SplicemachineContext.RowForKafka
+import com.spicemachine.spark.ingester.component.LoadAnalyzer
 
 class Loader(
               id: String,
@@ -16,6 +17,7 @@ class Loader(
               useFlowMarkers: Boolean,
               dataQueue: BlockingQueue[DataFrame],
               taskQueue: BlockingDeque[(Seq[RowForKafka], Long, String)],
+              analyzer: Option[LoadAnalyzer],
               batchRegulation: BatchRegulation,
               processing: AtomicBoolean,
               loggingOn: Boolean = false,
@@ -71,7 +73,14 @@ class Loader(
             (nsds.newTopic_streaming(), 0L)
           }
         }
-
+        
+        if(analyzer.isDefined) {
+          if(newTopic) {
+            analyzer.get.newTopic(topicName)
+          }
+          analyzer.get.analyze(df)
+        }
+        
         log(s"$id LOAD to $topicName")
         val (lastRows: Seq[RowForKafka], batchCount: Long, ptnInfo: Array[String]) = try {
           nsds.sendData_streaming(df, topicName)

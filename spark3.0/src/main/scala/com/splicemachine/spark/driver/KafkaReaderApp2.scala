@@ -20,6 +20,8 @@ import org.apache.kafka.common.serialization.IntegerSerializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.log4j.Logger
 import com.spicemachine.spark.ingester.SLIIngester
+import com.spicemachine.spark.ingester.component.LoadedTimestampTracker
+import com.spicemachine.spark.ingester.component.InsertedTimestampTracker
 
 case class InputData(fullTagName: String, tagName: String, time: Timestamp, value: String, quality: String)
 case class DeltaData(endTime: Timestamp, delta: Long, value: String, quality: String, valueState: String)
@@ -316,6 +318,9 @@ object KafkaReaderApp2 {
     
     log.info("Create SLIIngester")
 
+    val loadedQueue = new LinkedTransferQueue[(Timestamp,String)]()
+    val insertedQueue = new LinkedTransferQueue[String]()
+    
     val ingester = new SLIIngester(
       numLoaders,
       numInserters,
@@ -324,6 +329,8 @@ object KafkaReaderApp2 {
       spliceTable,
       spliceKafkaServers,
       spliceKafkaPartitions.toInt,  // equal to number of partition in DataFrame
+      Some(new LoadedTimestampTracker(loadedQueue, windowMs)),
+      Some(new InsertedTimestampTracker(insertedQueue)),
       upsert,
       true,  // loggingOn: Boolean
       useFlowMarkers
@@ -343,11 +350,12 @@ object KafkaReaderApp2 {
     val chkpntRoot = checkpointLocationRootDir + (if(!checkpointLocationRootDir.endsWith("/")) { "/" } else {""})
     
     val tsFormatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-    var prevLastFinishWn = Timestamp.from(java.time.Instant.now)
-    var lastFinishWn = Timestamp.from(java.time.Instant.now)
-    var firstPublish = true
+//    var prevLastFinishWn = Timestamp.from(java.time.Instant.now)
+//    var lastFinishWn = Timestamp.from(java.time.Instant.now)
+//    var firstPublish = true
     val eventStart = if(eventFormat.equalsIgnoreCase("json")) { "{\"ResampledEvent\": \"" } else {""}
     val eventEnd = if(eventFormat.equalsIgnoreCase("json")) { "\"}" } else {""}
+    val ldMap = collection.mutable.Map.empty[String,Timestamp]
 
     val strQuery = values
       .writeStream
@@ -365,30 +373,75 @@ object KafkaReaderApp2 {
 //          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
           ingester.ingest(batchDF)
           
-          if(batchDF.count > 0) {
-            //println(lastFinishWn)
-            val minStart = batchDF.map(r => r.getAs[Timestamp]("START_TS"))
-              .reduce((t1, t2) => if (t1.before(t2)) {
-                t1
-              } else {
-                t2
-              })
-            lastFinishWn = windowOf(minStart.getTime-1)._1
-            //println(lastFinishWn)
-
-            if(!lastFinishWn.equals(prevLastFinishWn) && !firstPublish) {
-              kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
-              val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
-              kafkaProducer.send(new ProducerRecord(
-                resampledEventTopic,
-                s"$eventStart${tsFormatter.format(lastFinishWn).toString}$eventEnd"
-              ))
-              prevLastFinishWn = lastFinishWn
-            } else {
-              firstPublish = false
-              prevLastFinishWn = lastFinishWn
+          var ldInfo = loadedQueue.peek
+          while( ldInfo != null ) {
+            val topic = ldInfo._2.split("::")(0)
+            val ts = ldInfo._1
+            if(insertedQueue.contains(topic)) {
+              var sent = false
+              while(!sent) {  // todo add counter to prevent inf loop
+                var insInfo = insertedQueue.poll
+                if (topic.equals(insInfo.split("::")(0))) {
+                  //println(s"Publishing ${ts}")
+                  kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
+                  val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+                  kafkaProducer.send(new ProducerRecord(
+                    resampledEventTopic,
+                    s"$eventStart${tsFormatter.format(ts).toString}$eventEnd"
+                  ))
+                  sent = true
+                  loadedQueue.poll
+                }
+              }
             }
+            //ldMap += ( topic -> ts )
+            //println(s"Loaded $topic $ts $ldMap")
+            ldInfo = loadedQueue.peek
           }
+          
+//          var insInfo = insertedQueue.poll
+//          while( insInfo != null ) {
+//            val topic = insInfo.split("::")(0)
+//            println(s"Inserted $topic")
+//            val ts = ldMap.remove(topic)
+//            if (ts.isDefined) {
+//              println(s"Publishing ${ts.get}")
+//              kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
+//              val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+//              kafkaProducer.send(new ProducerRecord(
+//                resampledEventTopic,
+//                s"$eventStart${tsFormatter.format(ts.get).toString}$eventEnd"
+//              ))
+//            } //else {
+//              //insertedQueue.put()
+//            //}
+//            insInfo = insertedQueue.poll
+//          }
+          
+//          if(batchDF.count > 0) {
+//            //println(lastFinishWn)
+//            val minStart = batchDF.map(r => r.getAs[Timestamp]("START_TS"))
+//              .reduce((t1, t2) => if (t1.before(t2)) {
+//                t1
+//              } else {
+//                t2
+//              })
+//            lastFinishWn = windowOf(minStart.getTime-1)._1
+//            //println(lastFinishWn)
+//
+//            if(!lastFinishWn.equals(prevLastFinishWn) && !firstPublish) {
+//              kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
+//              val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+//              kafkaProducer.send(new ProducerRecord(
+//                resampledEventTopic,
+//                s"$eventStart${tsFormatter.format(lastFinishWn).toString}$eventEnd"
+//              ))
+//              prevLastFinishWn = lastFinishWn
+//            } else {
+//              firstPublish = false
+//              prevLastFinishWn = lastFinishWn
+//            }
+//          }
           
 //          processBatch(batchDF, batchId)
           batchDF.unpersist

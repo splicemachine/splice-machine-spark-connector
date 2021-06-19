@@ -13,6 +13,7 @@ import org.apache.kafka.common.serialization.LongSerializer
 import org.apache.spark.sql.types.StructType
 import com.splicemachine.spark2.splicemachine.SplicemachineContext
 import com.splicemachine.spark2.splicemachine.SplicemachineContext.RowForKafka
+import com.spicemachine.spark.ingester.component.InsertCompleteAction
 
 class Inserter(
     id: String,
@@ -25,6 +26,7 @@ class Inserter(
     upsert: Boolean = false,
     taskQueue: BlockingQueue[(Seq[RowForKafka], Long, String)],
     batchCountQueue: BlockingQueue[Long],
+    onCompletion: Option[InsertCompleteAction],
     processing: AtomicBoolean,
     loggingOn: Boolean = false
   )
@@ -71,6 +73,7 @@ class Inserter(
             // Call NSDS insert
             nsds.insert_streaming(topicInfo)
             log(s"$id INS inserted")
+            onCompletion.foreach(_.insertComplete(topicInfo))
             // Send rcd count to metrics topic
             metricsProducer.send(new ProducerRecord(
               metricsTopic,

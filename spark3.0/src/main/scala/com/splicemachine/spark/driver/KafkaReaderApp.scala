@@ -173,6 +173,8 @@ object KafkaReaderApp {
       spliceTable,
       spliceKafkaServers,
       spliceKafkaPartitions.toInt,  // equal to number of partition in DataFrame
+      None,
+      None,
       upsert,
       true,  // loggingOn: Boolean
       useFlowMarkers
