@@ -1,0 +1,19 @@
+{{- $fullName := include "kafkaconsumer.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-public
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "kafkaconsumer.name" . }}
+    release: {{ .Release.Name }}
+    namespace: {{ .Release.Namespace }}
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 4040
+      name: spark
+  selector:
+    job-name: {{ template "kafkaconsumer.fullname" . }}
+
+

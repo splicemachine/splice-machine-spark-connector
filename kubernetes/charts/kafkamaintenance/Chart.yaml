@@ -1,0 +1,9 @@
+apiVersion: v1
+appVersion: 0.0.1
+description: Kafka Maintenance
+maintainers:
+- email: jpanko@splicemachine.com
+  name: Joe Panko
+name: kafkamaintenance
+version: 0.0.1
+
