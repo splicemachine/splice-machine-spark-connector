@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "kafkaconsumer.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafkaconsumer.labels" . | nindent 4 }}
+
+spec:
+  template:
+    spec:
+      serviceAccountName:  {{  .Values.serviceAccountName  }}
+      nodeSelector:
+        components: {{  .Values.nodeselectorLabel  }}
+      containers:
+      - name: kafkaconsumer
+        image: {{ .Values.image.name }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        env:
+          - name: NAMESPACE
+            value:  {{ .Release.Namespace }}
+          - name: APP_JAR
+            value: {{ .Values.job.appjar }}
+          - name: CLASS_NAME
+            value: {{ .Values.job.classname }}
+          - name: APP_ARGS
+            value: "{{ .Values.job.appargs }}"
+          - name: PACKAGES_LIST
+            value: {{ .Values.job.packageslist }}
+          - name: APP_NAME
+            value: {{ .Values.job.appname }}
+          - name: DOCKER_IMAGE
+            value:  {{ .Values.job.spark_image }}
+          - name: SPARK_EXECUTOR_MEMORY
+            value: {{ .Values.job.spark_executor_memory }}
+          - name: SPARK_EXECUTOR_CORES
+            value: "{{ .Values.job.spark_executor_cores }}"
+          - name: SPARK_EXECUTORS_COUNT
+            value: "{{ .Values.job.spark_executor_count }}"
+          - name: DRIVER_MEMORY
+            value: "{{ .Values.job.driver_memory }}"
+          - name: DEBUG_MODE
+            value: "{{ .Values.debug }}"
+
+      restartPolicy: Never
+

@@ -1,0 +1,9 @@
+apiVersion: v1
+appVersion: 0.0.1
+description: SSDS Kafka Reader App 3
+maintainers:
+- email: jramineni@splicemachine.com, jpanko@splicemachine.com
+  name: Jyotsna Ramineni, Joe Panko
+name: kafkareaderapp3
+version: 0.0.1
+
