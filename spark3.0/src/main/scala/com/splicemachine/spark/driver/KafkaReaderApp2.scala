@@ -52,6 +52,31 @@ object KafkaReaderApp2 {
     val groupId = args.slice(18,19).headOption.getOrElse("")
     val clientId = args.slice(19,20).headOption.getOrElse("")
 
+    def parseCheckpointLocation(pathValue: String): String = {
+      var validCheckPointLocation = "/tmp/"
+      val configuration = new org.apache.hadoop.conf.Configuration();
+      val pathValues = pathValue.split(";")
+      var found = false
+      var i = 0
+      val hdfs = org.apache.hadoop.fs.FileSystem.get(configuration);
+      while (!found && i < pathValues.size) {
+        val value = pathValues(i)
+        println(s"Checking NN $value")
+        i = i + 1
+        if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
+          validCheckPointLocation = value
+          found = true
+          println(s"Found NN $value")
+        }
+      }
+      if(!found) {
+        throw new Exception(s"Can't find a valid checkpoint location from input param: $pathValue")
+      }
+      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
+    }
+
+    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+    
     val log = Logger.getLogger(getClass.getName)
 
     val spark = SparkSession.builder.appName(appName).getOrCreate()
@@ -353,8 +378,6 @@ object KafkaReaderApp2 {
 //      ingester.ingest(df)
 //    }
 
-    val chkpntRoot = checkpointLocationRootDir + (if(!checkpointLocationRootDir.endsWith("/")) { "/" } else {""})
-    
     val tsFormatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 //    var prevLastFinishWn = Timestamp.from(java.time.Instant.now)
 //    var lastFinishWn = Timestamp.from(java.time.Instant.now)
@@ -366,7 +389,7 @@ object KafkaReaderApp2 {
     val strQuery = values
       .writeStream
 //      .outputMode("append")
-      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
+      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$spliceTable")
 //      .trigger(Trigger.ProcessingTime(s"$windowSize $windowSizeUnits"))
       .foreachBatch {
         (batchDF: DataFrame, batchId: Long) => try {
