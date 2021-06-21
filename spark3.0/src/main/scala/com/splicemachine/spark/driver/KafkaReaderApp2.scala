@@ -240,7 +240,13 @@ object KafkaReaderApp2 {
         }
         //(tag, v.mkString("|"))
         //tag
-        res.result.map(r => (r.fullTagName, r.wndStart, r.wndEnd, r.twa, r.valueState, r.quality)).iterator
+        res.result.map(r => {
+          val tag = if( r.fullTagName.contains("=") ) {
+            val s = r.fullTagName.split("=")
+            s(s.length - 1)
+          } else { r.fullTagName }
+          (tag, r.wndStart, r.wndEnd, r.twa, r.valueState, r.quality)
+        }).iterator
 //        wnData.result
       }).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
     
@@ -367,7 +373,7 @@ object KafkaReaderApp2 {
           log.info(s"transfer next batch $batchId")
 
           batchDF.persist
-          batchDF.show(false)
+          //batchDF.show(false)
           //batchDF.distinct.orderBy("value").show(false)
           
 //          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
