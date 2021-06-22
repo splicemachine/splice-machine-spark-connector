@@ -15,7 +15,7 @@ job:
 
   #appjar: "/opt/spark/jars/splice-machine-spark-connector_2.12-3.1.0.2002.jar"
   appjar: "/opt/spark/jars/splice-machine-spark-connector-assembly-3.1.0.2002.jar"
-  classname: "com.splicemachine.spark.driver.KafkaReaderApp2"
+  classname: "com.splicemachine.spark.driver.KafkaReaderApp3"
 
   #Specify the argument to pass to the spark application. The values are space separated with double quotes
   #around values so that has special characters will not result in errors
@@ -43,7 +43,7 @@ job:
 # .FULLTAGNAME.STRING.NOT.NULL,TAGNAME.STRING.NOT.NULL,TIME.TIMESTAMP.NOT.NULL,VALUE.STRING.NOT.NULL,QUALITY.STRING.NOT.NULL
 
 # IOTDEV03
-  appargs: \"kafkareaderapp3\" splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 RawTags .TAG.STRING.NOT.NULL,SERVERTIME.TIMESTAMP.NOT.NULL,SOURCETIME.TIMESTAMP.NOT.NULL,VALUE.DOUBLE.NOT.NULL,STATUS.STRING.NOT.NULL jdbc:splice://splicedb-hregion.iotdev03.svc.cluster.local:1527/splicedb;user=splice;password=admin; OCI.RAWTAGS_COMP_PS splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 1 1 2 latest hdfs://splicedb-hdfs-nn-0.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp;hdfs://splicedb-hdfs-nn-1.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp
+  appargs: \"kafkareaderapp3\" splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 RawTags .TAG.STRING.NOT.NULL,SERVERTIME.TIMESTAMP.NOT.NULL,SOURCETIME.TIMESTAMP.NOT.NULL,VALUE.DOUBLE.NOT.NULL,STATUS.STRING.NOT.NULL jdbc:splice://splicedb-hregion.iotdev03.svc.cluster.local:1527/splicedb;user=splice;password=admin; OCI.RAWTAGS_COMP_PS splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 1 1 2 latest hdfs://splicedb-hdfs-nn-0.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp
 # Dev k8s
 #  appargs: \"kafkareaderapp3\" kafka-broker-0-iotdev03-nonprod-aks-dev1.dev.splicemachine-dev.io:19092 resampling .FULLTAGNAME.STRING.NOT.NULL,TAGNAME.STRING.NOT.NULL,TIME.TIMESTAMP.NOT.NULL,VALUE.DOUBLE.NOT.NULL,QUALITY.INT.NOT.NULL jdbc:splice://splicedb-hregion.db3.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci.resampled_data_1m_stream splicedb-kafka-0.splicedb-kafka-headless.db3.svc.cluster.local:9092 1 1 2 latest true
 
