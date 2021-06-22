@@ -44,32 +44,40 @@ object KafkaReaderApp3 {
     val groupId = args.slice(18,19).headOption.getOrElse("")
     val clientId = args.slice(19,20).headOption.getOrElse("")
 
-    def parseCheckpointLocation(pathValue: String): String = {
-      var validCheckPointLocation = "/tmp/"
-      val configuration = new org.apache.hadoop.conf.Configuration();
-      val pathValues = pathValue.split(";")
-      var found = false
-      var i = 0
-      val hdfs = org.apache.hadoop.fs.FileSystem.get(configuration);
-      while (!found && i < pathValues.size) {
-        val value = pathValues(i)
-        println(s"Checking NN $value")
-        i = i + 1
-        if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
-          validCheckPointLocation = value
-          found = true
-          println(s"Found NN $value")
-        }
-      }
-      if(!found) {
-        throw new Exception(s"Can't find a valid checkpoint location from input param: $pathValue")
-      }
-      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
-    }
-
-    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
-    
     val log = Logger.getLogger(getClass.getName)
+
+//    def parseCheckpointLocation(pathValue: String): String = {
+//      var validCheckPointLocation = "/tmp/"
+//      val configuration = new org.apache.hadoop.conf.Configuration();
+//      val pathValues = pathValue.split(";")
+//      var found = false
+//      var i = 0
+//      val hdfs = org.apache.hadoop.fs.FileSystem.get(configuration);
+//      while (!found && i < pathValues.size) {
+//        val value = pathValues(i)
+//        println(s"Checking NN $value")
+//        i = i + 1
+//        try {
+//          if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
+//            validCheckPointLocation = value
+//            found = true
+//            println(s"Found NN $value")
+//          }
+//        } catch {
+//          case e: Throwable =>
+//            log.error(s"Problem validating checkpoint\n$e")
+//        }
+//      }
+//      if(!found) {
+//        validCheckPointLocation = pathValues(0)
+//        println(s"Can't find a valid checkpoint location from input param: $pathValue\nWill use $validCheckPointLocation")
+//      }
+//      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
+//    }
+//
+//    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+
+    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
 
     val spark = SparkSession.builder.appName(appName).getOrCreate()
 
@@ -128,6 +136,7 @@ object KafkaReaderApp3 {
       .option("kafka.bootstrap.servers", externalKafkaServers)
       //.option("minPartitions", minPartitions)  // probably better to rely on num partitions of the external topic
       .option("failOnDataLoss", "false")
+      .option("startingOffsets", startingOffsets)
 
     maxPollRecs.foreach( reader.option("kafka.max.poll.records", _) )
 
@@ -242,11 +251,11 @@ object KafkaReaderApp3 {
     
     val strQuery = values
       .writeStream
-      .option("checkpointLocation",s"/tmp/checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
+      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$spliceTable")
 //      .trigger(Trigger.ProcessingTime(2.second))
       .foreachBatch {
         (batchDF: DataFrame, batchId: Long) => try {
-          log.info(s"transfer next batch")
+          log.info(s"transfer next batch $batchId")
 //          dataQueue.transfer(batchDF)
           ingester.ingest(batchDF)
 //          if( ! batchDF.isEmpty ) {
