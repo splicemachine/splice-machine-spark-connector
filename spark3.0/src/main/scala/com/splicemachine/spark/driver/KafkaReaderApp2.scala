@@ -412,8 +412,9 @@ object KafkaReaderApp2 {
 //          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
           ingester.ingest(batchDF)
           
+          var count = 0
           var ldInfo = loadedQueue.peek
-          while( ldInfo != null ) {
+          while( ldInfo != null && count < 100 ) {
             val topic = ldInfo._2.split("::")(0)
             val ts = ldInfo._1
             if(insertedQueue.contains(topic)) {
@@ -438,6 +439,7 @@ object KafkaReaderApp2 {
             //ldMap += ( topic -> ts )
             //println(s"Loaded $topic $ts $ldMap")
             ldInfo = loadedQueue.peek
+            count += 1
           }
           
 //          var insInfo = insertedQueue.poll
