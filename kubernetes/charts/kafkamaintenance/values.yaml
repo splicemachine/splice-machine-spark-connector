@@ -11,6 +11,8 @@ image:
 
 # Details of the Spark Job to run
 job:
+  continuousrun: true
+
 #  appjar: "/opt/app/jars/splice-adapter-kafka-streaming-1.0-SNAPSHOT-jar-with-dependencies.jar"
 #  classname: "KafkaReader"
 

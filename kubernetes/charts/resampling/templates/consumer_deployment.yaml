@@ -1,6 +1,6 @@
-{{- if not  .Values.job.continuousrun }}
-apiVersion: batch/v1
-kind: Job
+{{- if .Values.job.continuousrun }}
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: {{ template "kafkaconsumer.fullname" . }}
   namespace: {{ .Release.Namespace }}
@@ -8,7 +8,18 @@ metadata:
     {{- include "kafkaconsumer.labels" . | nindent 4 }}
 
 spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "kafkaconsumer.labels" . | nindent 6 }}
+  replicas: {{ .Values.replicas }}
   template:
+    metadata:
+      labels:
+        {{- include "kafkaconsumer.labels" . | nindent 8 }}
+        custappname: {{ .Values.job.appname }}
+        component: driver
     spec:
       serviceAccountName:  {{  .Values.serviceAccountName  }}
       nodeSelector:
@@ -43,5 +54,4 @@ spec:
           - name: DEBUG_MODE
             value: "{{ .Values.debug }}"
 
-      restartPolicy: Never
-{{- end -}}
+ {{- end -}}

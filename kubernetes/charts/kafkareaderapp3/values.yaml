@@ -11,6 +11,8 @@ image:
 
 # Details of the Spark Job to run
 job:
+  continuousrun: true
+
   #appjar: "/opt/spark/jars/splice-machine-spark-connector_2.12-3.1.0.2002.jar"
   appjar: "/opt/spark/jars/splice-machine-spark-connector-assembly-3.1.0.2002.jar"
   classname: "com.splicemachine.spark.driver.KafkaReaderApp2"
