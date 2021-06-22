@@ -46,35 +46,35 @@ object KafkaReaderApp3 {
 
     val log = Logger.getLogger(getClass.getName)
 
-//    def parseCheckpointLocation(pathValue: String): String = {
-//      var validCheckPointLocation = "/tmp/"
-//      val configuration = new org.apache.hadoop.conf.Configuration();
-//      val pathValues = pathValue.split(";")
-//      var found = false
-//      var i = 0
-//      val hdfs = org.apache.hadoop.fs.FileSystem.get(configuration);
-//      while (!found && i < pathValues.size) {
-//        val value = pathValues(i)
-//        println(s"Checking NN $value")
-//        i = i + 1
-//        try {
-//          if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
-//            validCheckPointLocation = value
-//            found = true
-//            println(s"Found NN $value")
-//          }
-//        } catch {
-//          case e: Throwable =>
-//            log.error(s"Problem validating checkpoint\n$e")
-//        }
-//      }
-//      if(!found) {
-//        validCheckPointLocation = pathValues(0)
-//        println(s"Can't find a valid checkpoint location from input param: $pathValue\nWill use $validCheckPointLocation")
-//      }
-//      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
-//    }
-//
+    def parseCheckpointLocation(pathValue: String): String = {
+      var validCheckPointLocation = "/tmp/"
+      val configuration = new org.apache.hadoop.conf.Configuration();
+      val pathValues = pathValue.split(";")
+      var found = false
+      var i = 0
+      while (!found && i < pathValues.size) {
+        val value = pathValues(i)
+        println(s"Checking NN $value")
+        i = i + 1
+        try {
+          val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(value), configuration);
+          if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
+            validCheckPointLocation = value
+            found = true
+            println(s"Found NN $value")
+          }
+        } catch {
+          case e: Throwable =>
+            log.warn(s"NN $value is not available: ${e.getMessage}")
+        }
+      }
+      if(!found) {
+        validCheckPointLocation = pathValues(0)
+        println(s"Can't find a valid checkpoint location from input param: $pathValue\nWill use $validCheckPointLocation")
+      }
+      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
+    }
+
 //    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
 
     val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
