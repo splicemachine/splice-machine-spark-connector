@@ -70,10 +70,13 @@ class Inserter(
           if (lastRows.headOption.isDefined) {
             //val topicName = lastRows.head.topicName
             log(s"$id INS task $topicInfo $batchCount")
-            // Call NSDS insert
-            nsds.insert_streaming(topicInfo)
-            log(s"$id INS inserted")
-            onCompletion.foreach(_.insertComplete(topicInfo))
+            try {
+              // Call NSDS insert
+              nsds.insert_streaming(topicInfo)
+              log(s"$id INS inserted")
+            } finally {
+              onCompletion.foreach(_.insertComplete(topicInfo))
+            }
             // Send rcd count to metrics topic
             metricsProducer.send(new ProducerRecord(
               metricsTopic,

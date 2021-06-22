@@ -52,33 +52,35 @@ object KafkaReaderApp2 {
     val groupId = args.slice(18,19).headOption.getOrElse("")
     val clientId = args.slice(19,20).headOption.getOrElse("")
 
-    def parseCheckpointLocation(pathValue: String): String = {
-      var validCheckPointLocation = "/tmp/"
-      val configuration = new org.apache.hadoop.conf.Configuration();
-      val pathValues = pathValue.split(";")
-      var found = false
-      var i = 0
-      val hdfs = org.apache.hadoop.fs.FileSystem.get(configuration);
-      while (!found && i < pathValues.size) {
-        val value = pathValues(i)
-        println(s"Checking NN $value")
-        i = i + 1
-        if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
-          validCheckPointLocation = value
-          found = true
-          println(s"Found NN $value")
-        }
-      }
-      if(!found) {
-        throw new Exception(s"Can't find a valid checkpoint location from input param: $pathValue")
-      }
-      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
-    }
-
-    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
-    
     val log = Logger.getLogger(getClass.getName)
 
+//    def parseCheckpointLocation(pathValue: String): String = {
+//      var validCheckPointLocation = "/tmp/"
+//      val configuration = new org.apache.hadoop.conf.Configuration();
+//      val pathValues = pathValue.split(";")
+//      var found = false
+//      var i = 0
+//      val hdfs = org.apache.hadoop.fs.FileSystem.get(configuration);
+//      while (!found && i < pathValues.size) {
+//        val value = pathValues(i)
+//        println(s"Checking NN $value")
+//        i = i + 1
+//        if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
+//          validCheckPointLocation = value
+//          found = true
+//          println(s"Found NN $value")
+//        }
+//      }
+//      if(!found) {
+//        throw new Exception(s"Can't find a valid checkpoint location from input param: $pathValue")
+//      }
+//      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
+//    }
+//
+//    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+
+    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+    
     val spark = SparkSession.builder.appName(appName).getOrCreate()
     import spark.implicits._
 
@@ -200,6 +202,7 @@ object KafkaReaderApp2 {
 //      .flatMapGroups((tag,valItr) => {
         def sortByTime(r1: InputData, r2: InputData): Boolean = r1.time.before(r2.time)
         val newState = valItr.toSeq.sortWith(sortByTime)
+        //println(s"Count of $tag ${newState.size}")
         val itr = if(state.exists) {
           val prevState = state.get.sortWith(sortByTime)
           val (wnStart, wnEnd) = windowOf(newState.head.time.getTime - watermarkThresholdMs)
@@ -396,7 +399,8 @@ object KafkaReaderApp2 {
           log.info(s"transfer next batch $batchId")
 
           batchDF.persist
-          //batchDF.show(false)
+          batchDF.show(false)
+          //log.info(s"Batch size: ${batchDF.count}")
           //batchDF.distinct.orderBy("value").show(false)
           
 //          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
@@ -422,6 +426,8 @@ object KafkaReaderApp2 {
                   loadedQueue.poll
                 }
               }
+            } else {
+              log.error(s"$topic not in insertedQueue")
             }
             //ldMap += ( topic -> ts )
             //println(s"Loaded $topic $ts $ldMap")
