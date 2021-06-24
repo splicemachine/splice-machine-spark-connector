@@ -3,7 +3,6 @@ package com.splicemachine.spark.driver
 import java.util.Properties
 import java.util.concurrent.{LinkedBlockingDeque, LinkedTransferQueue}
 import java.util.concurrent.atomic.AtomicBoolean
-
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
@@ -43,6 +42,7 @@ object KafkaReaderApp3 {
     val maxPollRecs = args.slice(17,18).headOption
     val groupId = args.slice(18,19).headOption.getOrElse("")
     val clientId = args.slice(19,20).headOption.getOrElse("")
+    val livenessPort = args.slice(21,21).headOption.getOrElse("6901").toInt
 
     val log = Logger.getLogger(getClass.getName)
 
@@ -54,14 +54,14 @@ object KafkaReaderApp3 {
       var i = 0
       while (!found && i < pathValues.size) {
         val value = pathValues(i)
-        println(s"Checking NN $value")
+        log.info(s"Checking NN $value")
         i = i + 1
         try {
           val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(value), configuration);
           if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
             validCheckPointLocation = value
             found = true
-            println(s"Found NN $value")
+            log.info(s"Found NN $value")
           }
         } catch {
           case e: Throwable =>
@@ -70,14 +70,18 @@ object KafkaReaderApp3 {
       }
       if(!found) {
         validCheckPointLocation = pathValues(0)
-        println(s"Can't find a valid checkpoint location from input param: $pathValue\nWill use $validCheckPointLocation")
+        log.error(s"Can't find a valid checkpoint location from input param: $pathValue\nWill use $validCheckPointLocation")
       }
       if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
     }
 
-//    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+    val livenessSocket = new LivenessSocket(livenessPort)
 
-    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+
+//    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+
+    log.info(s"Checkpoint Location: $chkpntRoot")
 
     val spark = SparkSession.builder.appName(appName).getOrCreate()
 
@@ -318,6 +322,7 @@ object KafkaReaderApp3 {
     strQuery.stop()
     spark.stop()
     ingester.stop()
+    livenessSocket.close()
 //    processing.compareAndSet(true, false)
   }
 }

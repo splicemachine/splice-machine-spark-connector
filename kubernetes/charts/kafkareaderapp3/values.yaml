@@ -69,6 +69,8 @@ job:
   spark_executor_memory: "4G"
   spark_executor_cores: "5"
   spark_executor_count: "4"
+  liveness_port: "6901"
+
 
 #Set this to true, if you need the pod to not terminate upon finishing the job, so you can log in and debug
 debug: true

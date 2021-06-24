@@ -52,5 +52,13 @@ spec:
             value: "{{ .Values.job.driver_memory }}"
           - name: DEBUG_MODE
             value: "{{ .Values.debug }}"
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.job.liveness_port }}
+          initialDelaySeconds: 30
+          timeoutSeconds: 3
+          periodSeconds: 30
+          successThreshold: 1
+          failureThreshold: 5
 
 {{- end -}}
