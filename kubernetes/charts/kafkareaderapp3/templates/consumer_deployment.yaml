@@ -59,6 +59,6 @@ spec:
           timeoutSeconds: 3
           periodSeconds: 30
           successThreshold: 1
-          failureThreshold: 5
+          failureThreshold: 1
 
 {{- end -}}

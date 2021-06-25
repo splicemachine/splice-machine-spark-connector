@@ -43,7 +43,8 @@ object KafkaReaderApp3 {
     val maxPollRecs = args.slice(17,18).headOption
     val groupId = args.slice(18,19).headOption.getOrElse("")
     val clientId = args.slice(19,20).headOption.getOrElse("")
-    val livenessPort = args.slice(21,21).headOption.getOrElse("6901").toInt
+    val livenessPort = args.slice(20,21).headOption.getOrElse("6901").toInt
+    val livenessUpdateTimeout = args.slice(21,22).headOption.getOrElse("60").toLong
 
     val log = Logger.getLogger(getClass.getName)
 
@@ -75,7 +76,7 @@ object KafkaReaderApp3 {
       if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
     }
 
-    val livenessSocket = new LivenessSocket(livenessPort)
+    val livenessSocket = new LivenessSocket(livenessPort, livenessUpdateTimeout)
     val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
 
 //    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
@@ -309,11 +310,14 @@ object KafkaReaderApp3 {
 //                    .save
 
 //          println(s"${java.time.Instant.now} transferred batch having ${batchDF.count}")  // todo log count as trace or diagnostic
+          livenessSocket.updated()
           log.info(s"transferred batch")
         } catch {
-          case e: Throwable =>
+          case e: Throwable => {
+            livenessSocket.failed()
             log.error(s"KafkaReader Exception processing batch $batchId\n$e")
-//            e.printStackTrace
+            //            e.printStackTrace
+          }
         }
       }.start()
 
