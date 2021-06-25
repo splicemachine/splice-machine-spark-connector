@@ -3,6 +3,7 @@ package com.splicemachine.spark.driver
 import java.util.Properties
 import java.util.concurrent.{LinkedBlockingDeque, LinkedTransferQueue}
 import java.util.concurrent.atomic.AtomicBoolean
+
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
@@ -69,20 +70,18 @@ object KafkaReaderApp3 {
         }
       }
       if(!found) {
-        validCheckPointLocation = pathValues(0)
-        log.error(s"Can't find a valid checkpoint location from input param: $pathValue\nWill use $validCheckPointLocation")
+        log.warn(s"Can't find a valid checkpoint location from input param: $pathValue")
       }
       if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
     }
 
     val livenessSocket = new LivenessSocket(livenessPort)
-
     val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
 
 //    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
 
     log.info(s"Checkpoint Location: $chkpntRoot")
-
+    
     val spark = SparkSession.builder.appName(appName).getOrCreate()
 
 //    val props = new Properties

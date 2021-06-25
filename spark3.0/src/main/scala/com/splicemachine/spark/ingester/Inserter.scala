@@ -75,7 +75,10 @@ class Inserter(
               nsds.insert_streaming(topicInfo)
               log(s"$id INS inserted")
             } finally {
-              onCompletion.foreach(_.insertComplete(topicInfo))
+              onCompletion.foreach(ca => {
+                ca.insertComplete(topicInfo)
+                log(s"$id INS completed $topicInfo by ${ca}")
+              })
             }
             // Send rcd count to metrics topic
             metricsProducer.send(new ProducerRecord(

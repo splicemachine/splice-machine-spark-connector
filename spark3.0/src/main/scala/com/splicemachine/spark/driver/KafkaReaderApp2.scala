@@ -79,13 +79,12 @@ object KafkaReaderApp2 {
         }
       }
       if(!found) {
-        throw new Exception(s"Can't find a valid checkpoint location from input param: $pathValue")
+        log.warn(s"Can't find a valid checkpoint location from input param: $pathValue")
       }
       if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
     }
 
     val livenessSocket = new LivenessSocket(livenessPort)
-
     val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
 
 //    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
@@ -430,10 +429,12 @@ object KafkaReaderApp2 {
                   //println(s"Publishing ${ts}")
                   kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
                   val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+                  val tsStr = tsFormatter.format(ts).toString
                   kafkaProducer.send(new ProducerRecord(
                     resampledEventTopic,
-                    s"$eventStart${tsFormatter.format(ts).toString}$eventEnd"
+                    s"$eventStart${tsStr}$eventEnd"
                   ))
+                  log.info(s"Published $tsStr after inserting $topic")
                   sent = true
                   loadedQueue.poll
                 }

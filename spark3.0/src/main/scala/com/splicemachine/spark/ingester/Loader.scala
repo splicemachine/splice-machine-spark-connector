@@ -77,6 +77,7 @@ class Loader(
         if(analyzer.isDefined) {
           if(newTopic) {
             analyzer.get.newTopic(topicName)
+            log(s"$id LOAD track new topic $topicName by ${analyzer}")
           }
           analyzer.get.analyze(df)
         }
