@@ -62,14 +62,14 @@ object KafkaReaderApp2 {
       var i = 0
       while (!found && i < pathValues.size) {
         val value = pathValues(i)
-        println(s"Checking NN $value")
+        log.info(s"Checking NN $value")
         i = i + 1
         try {
           val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(value), configuration);
           if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
             validCheckPointLocation = value
             found = true
-            println(s"Found NN $value")
+            log.info(s"Found NN $value")
           }
         } catch {
           case e: Throwable => {
@@ -78,14 +78,16 @@ object KafkaReaderApp2 {
         }
       }
       if(!found) {
-        throw new Exception(s"Can't find a valid checkpoint location from input param: $pathValue")
+        log.warn(s"Can't find a valid checkpoint location from input param: $pathValue")
       }
       if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
     }
 
-//    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
 
-    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+//    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+
+    log.info(s"Checkpoint Location: $chkpntRoot")
     
     val spark = SparkSession.builder.appName(appName).getOrCreate()
     import spark.implicits._
@@ -425,10 +427,12 @@ object KafkaReaderApp2 {
                   //println(s"Publishing ${ts}")
                   kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
                   val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+                  val tsStr = tsFormatter.format(ts).toString
                   kafkaProducer.send(new ProducerRecord(
                     resampledEventTopic,
-                    s"$eventStart${tsFormatter.format(ts).toString}$eventEnd"
+                    s"$eventStart${tsStr}$eventEnd"
                   ))
+                  log.info(s"Published $tsStr after inserting $topic")
                   sent = true
                   loadedQueue.poll
                 }

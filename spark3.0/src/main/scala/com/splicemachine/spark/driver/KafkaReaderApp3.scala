@@ -54,14 +54,14 @@ object KafkaReaderApp3 {
       var i = 0
       while (!found && i < pathValues.size) {
         val value = pathValues(i)
-        println(s"Checking NN $value")
+        log.info(s"Checking NN $value")
         i = i + 1
         try {
           val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(value), configuration);
           if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
             validCheckPointLocation = value
             found = true
-            println(s"Found NN $value")
+            log.info(s"Found NN $value")
           }
         } catch {
           case e: Throwable =>
@@ -69,16 +69,17 @@ object KafkaReaderApp3 {
         }
       }
       if(!found) {
-        validCheckPointLocation = pathValues(0)
-        println(s"Can't find a valid checkpoint location from input param: $pathValue\nWill use $validCheckPointLocation")
+        log.warn(s"Can't find a valid checkpoint location from input param: $pathValue")
       }
       if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
     }
 
-//    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
 
-    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+//    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
 
+    log.info(s"Checkpoint Location: $chkpntRoot")
+    
     val spark = SparkSession.builder.appName(appName).getOrCreate()
 
 //    val props = new Properties
