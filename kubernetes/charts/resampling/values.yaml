@@ -6,7 +6,7 @@
 #Set the docker version of kafka conumer here / ssds driver
 image:
   name: jpanko/ssds-resampling
-  tag:  'pod-spark3.0.1-21'
+  tag:  'pod-spark3.0.1-25'
 
 
 # Details of the Spark Job to run
@@ -45,7 +45,7 @@ job:
 # Resampling
 # for straight ingest, use KafkaReader class
 # IOTDEV03
-  appargs: \"resampling\" splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 RawTags .TAG.STRING.NOT.NULL,SERVERTIME.TIMESTAMP.NOT.NULL,SOURCETIME.TIMESTAMP.NOT.NULL,VALUE.STRING,STATUS.STRING.NOT.NULL jdbc:splice://splicedb-hregion.iotdev03.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci2.resampled_data_1m splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 1 1 1 latest hdfs://splicedb-hdfs-nn-0.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp true
+  appargs: \"resampling\" splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 RawTags .TAG.STRING.NOT.NULL,SERVERTIME.TIMESTAMP.NOT.NULL,SOURCETIME.TIMESTAMP.NOT.NULL,VALUE.STRING,STATUS.STRING.NOT.NULL jdbc:splice://splicedb-hregion.iotdev03.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci2.resampled_data_1m splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 1 1 1 latest hdfs://splicedb-hdfs-nn-0.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp;hdfs://splicedb-hdfs-nn-1.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp true
 # Dev k8s
 #  appargs: \"resampling\" kafka-broker-0-iotdev03-nonprod-aks-dev1.dev.splicemachine-dev.io:19092 resampling .FULLTAGNAME.STRING.NOT.NULL,TAGNAME.STRING.NOT.NULL,TIME.TIMESTAMP.NOT.NULL,VALUE.DOUBLE.NOT.NULL,QUALITY.INT.NOT.NULL jdbc:splice://splicedb-hregion.db3.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci.resampled_data_1m_stream splicedb-kafka-0.splicedb-kafka-headless.db3.svc.cluster.local:9092 1 1 2 latest true
 
@@ -67,7 +67,7 @@ job:
 
   driver_memory: "1g"
 
-  spark_image: jpanko/ssds-resampling-exec:pod-spark3.0.1-21
+  spark_image: jpanko/ssds-resampling-exec:pod-spark3.0.1-25
   spark_executor_memory: "4G"
   spark_executor_cores: "5"
   spark_executor_count: "4"
