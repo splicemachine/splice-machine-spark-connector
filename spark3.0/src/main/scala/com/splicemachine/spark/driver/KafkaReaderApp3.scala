@@ -159,7 +159,7 @@ object KafkaReaderApp3 {
         .map(r => {
           //val quality = if(r.getAs[String]("STATUS").contains("StatusCode(Good)")) 192 else 0
           Row(
-            r.getAs[String]("TAG"), r.getAs[String]("TAG"), r.getAs[Timestamp]("SERVERTIME"), r.getAs[Double]("VALUE"),
+            r.getAs[String]("TAG"), r.getAs[String]("TAG"), r.getAs[Timestamp]("SOURCETIME"), r.getAs[Double]("VALUE"),
             if(r.getAs[String]("STATUS").contains("StatusCode(Good)")) 192 else 0
           )
         }) (RowEncoder(
