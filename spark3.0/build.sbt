@@ -1,6 +1,6 @@
 name := "splice-machine-spark-connector"
 
-val spliceVersion = "3.1.0.2002"
+val spliceVersion = "3.1.0.2016"
 
 version := spliceVersion
 
