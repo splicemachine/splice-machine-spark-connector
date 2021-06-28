@@ -573,6 +573,9 @@ object KafkaReaderApp2 {
           //batchDF.distinct.orderBy("value").show(false)
           
 //          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
+
+// TODO Remove DEBUG duplicate rows
+        batchDF.groupBy(col("FULL_TAG_NAME"), col("START_TS")).count().filter($"count" >= 2).show()
           ingester.ingest(batchDF)
           
           var count = 0
