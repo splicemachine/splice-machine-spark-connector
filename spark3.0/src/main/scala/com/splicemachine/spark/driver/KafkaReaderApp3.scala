@@ -22,27 +22,8 @@ import java.sql.Timestamp
 
 object KafkaReaderApp3 {
   def main(args: Array[String]) {
-    val appName = args(0)
-    val externalKafkaServers = args(1)
-    val externalTopic = args(2)
-    var schemaDDL = args(3)
-    val spliceUrl = args(4)
-    val spliceTable = args(5)
-    val spliceKafkaServers = args.slice(6,7).headOption.getOrElse("localhost:9092")
-    val spliceKafkaPartitions = args.slice(7,8).headOption.getOrElse("1")
-//    val spliceKafkaTimeout = args.slice(7,8).headOption.getOrElse("20000")
-    val numLoaders = args.slice(8,9).headOption.getOrElse("1").toInt
-    val numInserters = args.slice(9,10).headOption.getOrElse("1").toInt
-    val startingOffsets = args.slice(10,11).headOption.getOrElse("latest")
-    val checkpointLocationRootDir = args.slice(11,12).headOption.getOrElse("/tmp")
-    val upsert = args.slice(12,13).headOption.getOrElse("false").toBoolean
-    val eventFormat = args.slice(13,14).headOption.getOrElse("flat")
-    val dataTransformation = args.slice(14,15).headOption.getOrElse("false").toBoolean
-    val tagFilename = args.slice(15,16).headOption.getOrElse("")
-    val useFlowMarkers = args.slice(16,17).headOption.getOrElse("false").toBoolean
-    val maxPollRecs = args.slice(17,18).headOption
-    val groupId = args.slice(18,19).headOption.getOrElse("")
-    val clientId = args.slice(19,20).headOption.getOrElse("")
+    val appConfig = new AppConfig(args)
+    val config = appConfig.applicationConfig
 
     val log = Logger.getLogger(getClass.getName)
 
@@ -74,13 +55,13 @@ object KafkaReaderApp3 {
       if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
     }
 
-    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
+    val chkpntRoot = parseCheckpointLocation(config.checkpointLocationRootDir)
 
 //    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
 
     log.info(s"Checkpoint Location: $chkpntRoot")
     
-    val spark = SparkSession.builder.appName(appName).getOrCreate()
+    val spark = SparkSession.builder.appName(config.appName).getOrCreate()
 
 //    val props = new Properties
 //    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, spliceKafkaServers)
@@ -97,6 +78,7 @@ object KafkaReaderApp3 {
     var schema = new StructType
     var splitter = " "
     var notNull = "NOT NULL"
+    var schemaDDL = config.schemaDDL
     if( schemaDDL.trim.startsWith(".") ) {
       schemaDDL = schemaDDL.trim.substring(1, schemaDDL.length)
       splitter = "[.]"
@@ -111,15 +93,15 @@ object KafkaReaderApp3 {
 //    val schema = new SplicemachineContext(spliceUrl, externalKafkaServers).getSchema(spliceTable)
 
     val smcParams = Map(
-      "url" -> spliceUrl,
-      "KAFKA_SERVERS" -> spliceKafkaServers,
-      "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions
+      "url" -> config.spliceUrl,
+      "KAFKA_SERVERS" -> config.spliceKafkaServers,
+      "KAFKA_TOPIC_PARTITIONS" -> config.spliceKafkaPartitions.toString
     )
 
     val smc = new SplicemachineContext( smcParams )
 
-    if( ! smc.tableExists( spliceTable ) ) {
-      smc.createTable( spliceTable , schema )
+    if( ! smc.tableExists( config.spliceTable ) ) {
+      smc.createTable( config.spliceTable , schema )
     }
     
     // ParallelInsert didn't seem to help
@@ -133,21 +115,21 @@ object KafkaReaderApp3 {
     val reader = spark
       .readStream
       .format("kafka")
-      .option("subscribe", externalTopic)
-      .option("kafka.bootstrap.servers", externalKafkaServers)
+      .option("subscribe", config.externalTopic)
+      .option("kafka.bootstrap.servers", config.externalKafkaServers)
       //.option("minPartitions", minPartitions)  // probably better to rely on num partitions of the external topic
       .option("failOnDataLoss", "false")
-      .option("startingOffsets", startingOffsets)
+      .option("startingOffsets", config.startingOffsets)
 
-    maxPollRecs.foreach( reader.option("kafka.max.poll.records", _) )
+    config.maxPollRecs.foreach( reader.option("kafka.max.poll.records", _) )
 
-    if( ! groupId.isEmpty ) {
-      val group = s"splice-ssds-$groupId"
+    if( ! config.groupId.isEmpty ) {
+      val group = s"splice-ssds-$config.groupId"
       reader.option("kafka.group.id", group)
-      reader.option("kafka.client.id", s"$group-$clientId")  // probably should use uuid instead of user input TODO
+      reader.option("kafka.client.id", s"$group-$config.clientId")  // probably should use uuid instead of user input TODO
     }
     
-    val values = if (useFlowMarkers) {
+    val values = if (config.useFlowMarkers) {
       reader
         .load.select(from_json(col("value") cast "string", schema, Map( "timestampFormat" -> "yyyy-MM-dd HH:mm:ss.SSSSSS" )) as "data", col("timestamp") cast "long" as "TM_EXT_KAFKA")
         .selectExpr("data.*", "TM_EXT_KAFKA * 1000 as TM_EXT_KAFKA" )
@@ -177,18 +159,18 @@ object KafkaReaderApp3 {
 
     log.info("Create SLIIngester")
     val ingester = new SLIIngester(
-      numLoaders,
-      numInserters,
+      config.numLoaders,
+      config.numInserters,
       values.schema,
-      spliceUrl,
-      spliceTable,
-      spliceKafkaServers,
-      spliceKafkaPartitions.toInt,  // equal to number of partition in DataFrame
+      config.spliceUrl,
+      config.spliceTable,
+      config.spliceKafkaServers,
+      config.spliceKafkaPartitions,  // equal to number of partition in DataFrame
       None,
       None,
       false, // upsert: Boolean
       true,  // loggingOn: Boolean
-      useFlowMarkers
+      config.useFlowMarkers
     )
     
 //    val dataQueue = new LinkedTransferQueue[DataFrame]()
@@ -252,7 +234,7 @@ object KafkaReaderApp3 {
     
     val strQuery = values
       .writeStream
-      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$spliceTable")
+      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$config.spliceTable")
 //      .trigger(Trigger.ProcessingTime(2.second))
       .foreachBatch {
         (batchDF: DataFrame, batchId: Long) => try {

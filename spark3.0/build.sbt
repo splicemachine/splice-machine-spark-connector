@@ -101,6 +101,7 @@ libraryDependencies += "com.rabbitmq.jms" % "rabbitmq-jms" % "1.11.0" excludeAll
 libraryDependencies += "io.confluent" % "kafka-jms-client" % "5.1.0" excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.geronimo.specs" % "geronimo-jms_1.1_spec" % "1.1" excludeAll (excludedDeps: _*)
 libraryDependencies += "com.ibm.mq" % "com.ibm.mq.allclient" % "9.2.2.0" excludeAll (excludedDeps: _*)
+libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.1" excludeAll (excludedDeps: _*)
 
 // For development only / local Splice SNAPSHOTs
 resolvers += Resolver.mavenLocal
