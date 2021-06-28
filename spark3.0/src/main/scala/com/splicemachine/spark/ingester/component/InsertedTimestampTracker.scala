@@ -6,5 +6,5 @@ class InsertedTimestampTracker(
                                 queue: LinkedTransferQueue[String]
                               ) extends InsertCompleteAction
 {
-  def insertComplete(topicInfo: String): Unit = queue.put(topicInfo)
+  def insertComplete(topicInfo: String): Unit = queue.put(topicInfo.split("::")(0))
 }
