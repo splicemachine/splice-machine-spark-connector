@@ -604,7 +604,7 @@ object KafkaReaderApp2 {
                 }
               }
             } else {
-              log.error(s"$topic not in insertedQueue: $insertedQueue")
+              log.info(s"$topic not in insertedQueue: $insertedQueue")
             }
             //ldMap += ( topic -> ts )
             //println(s"Loaded $topic $ts $ldMap")
