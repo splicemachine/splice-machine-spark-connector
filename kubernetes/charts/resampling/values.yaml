@@ -6,7 +6,7 @@
 #Set the docker version of kafka conumer here / ssds driver
 image:
   name: jpanko/ssds-resampling
-  tag:  'pod-spark3.0.1-25'
+  tag:  'pod-spark3.0.1-44'
 
 
 # Details of the Spark Job to run
@@ -14,7 +14,7 @@ job:
   continuousrun: true
 
   #appjar: "/opt/spark/jars/splice-machine-spark-connector_2.12-3.1.0.2002.jar"
-  appjar: "/opt/spark/jars/splice-machine-spark-connector-assembly-3.1.0.2002.jar"
+  appjar: "/opt/spark/jars/splice-machine-spark-connector-assembly-3.1.0.2016.jar"
   classname: "com.splicemachine.spark.driver.KafkaReaderApp2"
 
   #Specify the argument to pass to the spark application. The values are space separated with double quotes
@@ -45,9 +45,9 @@ job:
 # Resampling
 # for straight ingest, use KafkaReader class
 # IOTDEV03
-  appargs: \"resampling\" splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 RawTags .TAG.STRING.NOT.NULL,SERVERTIME.TIMESTAMP.NOT.NULL,SOURCETIME.TIMESTAMP.NOT.NULL,VALUE.STRING,STATUS.STRING.NOT.NULL jdbc:splice://splicedb-hregion.iotdev03.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci2.resampled_data_1m splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 1 1 1 latest hdfs://splicedb-hdfs-nn-0.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp;hdfs://splicedb-hdfs-nn-1.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp true
+  appargs: \"resampling\" splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 RawTags .TAG.STRING.NOT.NULL,SERVERTIME.TIMESTAMP.NOT.NULL,SOURCETIME.TIMESTAMP.NOT.NULL,VALUE.STRING,STATUS.STRING.NOT.NULL jdbc:splice://splicedb-hregion.iotdev03.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci2.resampled_data_1m splicedb-kafka-0.splicedb-kafka-headless.iotdev03.svc.cluster.local:9092 20 1 1 latest hdfs://splicedb-hdfs-nn-0.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp;hdfs://splicedb-hdfs-nn-1.splicedb-hdfs-nn.iotdev03.svc.cluster.local:8020/tmp true
 # Dev k8s
-#  appargs: \"resampling\" kafka-broker-0-iotdev03-nonprod-aks-dev1.dev.splicemachine-dev.io:19092 resampling .FULLTAGNAME.STRING.NOT.NULL,TAGNAME.STRING.NOT.NULL,TIME.TIMESTAMP.NOT.NULL,VALUE.DOUBLE.NOT.NULL,QUALITY.INT.NOT.NULL jdbc:splice://splicedb-hregion.db3.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci.resampled_data_1m_stream splicedb-kafka-0.splicedb-kafka-headless.db3.svc.cluster.local:9092 1 1 2 latest true
+#  appargs: \"resampling\" kafka-broker-0-iotdev03-nonprod-aks-dev1.dev.splicemachine-dev.io:19092 RawTags .TAG.STRING.NOT.NULL,SERVERTIME.TIMESTAMP.NOT.NULL,SOURCETIME.TIMESTAMP.NOT.NULL,VALUE.STRING,STATUS.STRING.NOT.NULL jdbc:splice://splicedb-hregion.db3.svc.cluster.local:1527/splicedb;user=splice;password=admin; oci2.resampled_data_1m splicedb-kafka-0.splicedb-kafka-headless.db3.svc.cluster.local:9092 20 1 1 latest hdfs://splicedb-hdfs-nn-0.splicedb-hdfs-nn.db3.svc.cluster.local:8020/tmp;hdfs://splicedb-hdfs-nn-1.splicedb-hdfs-nn.db3.svc.cluster.local:8020/tmp true 
 
 # External jdbc
 #  appargs: \"kafkareader\" splicedb-kafka-0.splicedb-kafka-headless.jp200910.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.jp200910.svc.cluster.local:9092,splicedb-kafka-2.splicedb-kafka-headless.jp200910.svc.cluster.local:9092  perf1 jdbc:splice://jdbc-jp200910-pd-eks-dev2.eks.splicemachine-dev.io:1527/splicedb;ssl=basic;user=splice;password=admin; perf1 72 splicedb-kafka-0.splicedb-kafka-headless.jp200910.svc.cluster.local:9092,splicedb-kafka-1.splicedb-kafka-headless.jp200910.svc.cluster.local:9092,splicedb-kafka-2.splicedb-kafka-headless.jp200910.svc.cluster.local:9092  
@@ -67,7 +67,7 @@ job:
 
   driver_memory: "1g"
 
-  spark_image: jpanko/ssds-resampling-exec:pod-spark3.0.1-25
+  spark_image: jpanko/ssds-resampling-exec:pod-spark3.0.1-44
   spark_executor_memory: "4G"
   spark_executor_cores: "5"
   spark_executor_count: "4"
