@@ -1,5 +1,5 @@
-NAME = jpanko/ssds-kafkareaderapp3
-VERSION = pod-spark3.0.1-1
+NAME = tdong/ssds-kafkareaderapp3
+VERSION = pod-spark3.0.1-7
 SPLICE_BASE_IMAGE_VERSION = 0.0.3
 
 CDH_VERSION=cdh6.3.2-1605554

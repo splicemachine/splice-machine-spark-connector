@@ -169,7 +169,7 @@ object KafkaReaderApp3 {
       config.spliceKafkaPartitions,  // equal to number of partition in DataFrame
       None,
       None,
-      false, // upsert: Boolean
+      true, // upsert: Boolean
       true,  // loggingOn: Boolean
       config.useFlowMarkers
     )

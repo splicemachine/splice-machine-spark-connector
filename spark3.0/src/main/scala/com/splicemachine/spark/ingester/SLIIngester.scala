@@ -36,7 +36,7 @@ class SLIIngester extends Ingester {  // Serial Loader Inserter == SLI
     this()
     log.info(s"Instantiate SLIIngester")
 
-    val conserveTopics = true
+    val conserveTopics = false
     val partitions = spliceKafkaPartitions.toString
 
     val taskQueue = new LinkedBlockingDeque[(Seq[RowForKafka], Long, String)]()
