@@ -3,7 +3,6 @@ package com.splicemachine.spark.driver
 import java.util.Properties
 import java.util.concurrent.{LinkedBlockingDeque, LinkedTransferQueue}
 import java.util.concurrent.atomic.AtomicBoolean
-
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
@@ -18,12 +17,14 @@ import org.apache.kafka.common.serialization.IntegerSerializer
 import org.apache.kafka.common.serialization.LongSerializer
 import org.apache.log4j.Logger
 import com.spicemachine.spark.ingester.SLIIngester
+import com.splicemachine.spark.util.AppConfigParser
+
 import java.sql.Timestamp
 
 object KafkaReaderApp3 {
   def main(args: Array[String]) {
-    val appConfig = new AppConfig(args)
-    val config = appConfig.applicationConfig
+    val configParser = new AppConfigParser[KafkaReaderConfig3](args, KafkaReaderCLI3())
+    val config = configParser.parseConfig(KafkaReaderConfig3())
 
     val log = Logger.getLogger(getClass.getName)
 
