@@ -23,10 +23,10 @@ import java.sql.Timestamp
 
 object KafkaReaderApp3 {
   def main(args: Array[String]) {
+    val log = Logger.getLogger(getClass.getName)
+
     val configParser = new AppConfigParser[KafkaReaderConfig3](args, KafkaReaderCLI3())
     val config = configParser.parseConfig(KafkaReaderConfig3())
-
-    val log = Logger.getLogger(getClass.getName)
 
     def parseCheckpointLocation(pathValue: String): String = {
       var validCheckPointLocation = "/tmp/"

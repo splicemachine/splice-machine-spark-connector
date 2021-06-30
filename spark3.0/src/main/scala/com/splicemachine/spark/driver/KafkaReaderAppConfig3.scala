@@ -50,15 +50,15 @@ case class KafkaReaderCLI3() extends AppConfigCLI[KafkaReaderConfig3] {
         .action((x, c) => c.copy(spliceTable = x)),
       opt[String]("spliceKafkaServers")
         .action((x, c) => c.copy(spliceKafkaServers = x)),
-      opt[Int]("spliceKafkaPartitions")
+      opt[Int]('p', "spliceKafkaPartitions")
         .action((x, c) => c.copy(spliceKafkaPartitions = x)),
-      opt[Int]("numLoaders")
+      opt[Int]('l', "numLoaders")
         .action((x, c) => c.copy(numLoaders = x)),
-      opt[Int]("numInserters")
+      opt[Int]('i', "numInserters")
         .action((x, c) => c.copy(numInserters = x)),
-      opt[String]("startingOffsets")
+      opt[String]('o', "startingOffsets")
         .action((x, c) => c.copy(startingOffsets = x)),
-      opt[String]("checkpointLocationRootDir")
+      opt[String]('c', "checkpointLocationRootDir")
         .action((x, c) => c.copy(checkpointLocationRootDir = x)),
       opt[Unit]("upsert")
         .action((_, c) => c.copy(upsert = true))
