@@ -44,13 +44,14 @@ object KafkaReaderApp2 {
     val startingOffsets = args.slice(10,11).headOption.getOrElse("latest")
     val checkpointLocationRootDir = args.slice(11,12).headOption.getOrElse("/tmp")
     val upsert = args.slice(12,13).headOption.getOrElse("false").toBoolean
-    val groupId = args.slice(13,14).headOption.getOrElse("")
-    val clientId = args.slice(14,15).headOption.getOrElse("")
-    val eventFormat = args.slice(15,16).headOption.getOrElse("flat")
-    val dataTransformation = args.slice(16,17).headOption.getOrElse("false").toBoolean
-    val tagFilename = args.slice(17,18).headOption.getOrElse("")
-    val useFlowMarkers = args.slice(18,19).headOption.getOrElse("false").toBoolean
-    val maxPollRecs = args.slice(19,20).headOption
+    val conserveTopics = args.slice(13,14).headOption.getOrElse("true").toBoolean
+    val groupId = args.slice(14,15).headOption.getOrElse("")
+    val clientId = args.slice(15,16).headOption.getOrElse("")
+    val eventFormat = args.slice(16,17).headOption.getOrElse("flat")
+    val dataTransformation = args.slice(17,18).headOption.getOrElse("false").toBoolean
+    val tagFilename = args.slice(18,19).headOption.getOrElse("")
+    val useFlowMarkers = args.slice(19,20).headOption.getOrElse("false").toBoolean
+    val maxPollRecs = args.slice(20,21).headOption
 
     val log = Logger.getLogger(getClass.getName)
 
@@ -461,6 +462,7 @@ object KafkaReaderApp2 {
       Some(new LoadedTimestampTracker(loadedQueue, windowMs)),
       Some(new InsertedTimestampTracker(insertedQueue)),
       upsert,
+      conserveTopics,
       true,  // loggingOn: Boolean
       useFlowMarkers
     )
