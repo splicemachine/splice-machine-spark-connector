@@ -3,7 +3,7 @@ package com.splicemachine.spark.driver
 import java.util.Properties
 import java.util.concurrent.{LinkedBlockingDeque, LinkedTransferQueue}
 import java.util.concurrent.atomic.AtomicBoolean
-import java.sql.Timestamp
+import java.sql.{Connection, DriverManager, PreparedStatement, SQLException, Timestamp}
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
@@ -45,13 +45,14 @@ object KafkaReaderApp2 {
     val checkpointLocationRootDir = args.slice(11,12).headOption.getOrElse("/tmp")
     val upsert = args.slice(12,13).headOption.getOrElse("false").toBoolean
     val conserveTopics = args.slice(13,14).headOption.getOrElse("true").toBoolean
-    val groupId = args.slice(14,15).headOption.getOrElse("")
-    val clientId = args.slice(15,16).headOption.getOrElse("")
-    val eventFormat = args.slice(16,17).headOption.getOrElse("flat")
-    val dataTransformation = args.slice(17,18).headOption.getOrElse("false").toBoolean
-    val tagFilename = args.slice(18,19).headOption.getOrElse("")
-    val useFlowMarkers = args.slice(19,20).headOption.getOrElse("false").toBoolean
-    val maxPollRecs = args.slice(20,21).headOption
+    val jdbcMode = args.slice(14,15).headOption.getOrElse("true").toBoolean
+    val groupId = args.slice(15,16).headOption.getOrElse("")
+    val clientId = args.slice(16,17).headOption.getOrElse("")
+    val eventFormat = args.slice(17,18).headOption.getOrElse("flat")
+    val dataTransformation = args.slice(18,19).headOption.getOrElse("false").toBoolean
+    val tagFilename = args.slice(19,20).headOption.getOrElse("")
+    val useFlowMarkers = args.slice(20,21).headOption.getOrElse("false").toBoolean
+    val maxPollRecs = args.slice(21,22).headOption
 
     val log = Logger.getLogger(getClass.getName)
 
@@ -446,26 +447,44 @@ object KafkaReaderApp2 {
 
     //# timeValues: (t1,v1,t2,v2,...)
     
-    log.info("Create SLIIngester")
-
     val loadedQueue = new LinkedTransferQueue[(Timestamp,String)]()
     val insertedQueue = new LinkedTransferQueue[String]()
     
-    val ingester = new SLIIngester(
-      numLoaders,
-      numInserters,
-      dbSchema,
-      spliceUrl,
-      spliceTable,
-      spliceKafkaServers,
-      spliceKafkaPartitions.toInt,  // equal to number of partition in DataFrame
-      Some(new LoadedTimestampTracker(loadedQueue, windowMs)),
-      Some(new InsertedTimestampTracker(insertedQueue)),
-      upsert,
-      conserveTopics,
-      true,  // loggingOn: Boolean
-      useFlowMarkers
-    )
+    var conn: Option[Connection] = None
+    var insert: Option[PreparedStatement] = None
+    var ingester: Option[SLIIngester] = None
+    
+    if(jdbcMode) {
+      try {
+        conn = Some(DriverManager.getConnection(spliceUrl))
+        conn.get.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE)
+        conn.get.setAutoCommit(false)
+        val upsertStr = if(upsert) { " --splice-properties insertMode=UPSERT\n" } else {""}
+        insert = Some(conn.get.prepareStatement("INSERT INTO " + spliceTable + upsertStr + " VALUES (?, ?, ?, ?, ?, ?)"))
+      } catch {
+        case sqlExp: SQLException => {
+          log.error(s"Problem setting up JDBC connection and prepared statement.\n$sqlExp")
+          System.exit(1)
+        }
+      }
+    } else {
+      log.info("Create SLIIngester")
+      ingester = Some(new SLIIngester(
+        numLoaders,
+        numInserters,
+        dbSchema,
+        spliceUrl,
+        spliceTable,
+        spliceKafkaServers,
+        spliceKafkaPartitions.toInt, // equal to number of partition in DataFrame
+        Some(new LoadedTimestampTracker(loadedQueue, windowMs)),
+        Some(new InsertedTimestampTracker(insertedQueue)),
+        upsert,
+        conserveTopics,
+        true, // loggingOn: Boolean
+        useFlowMarkers
+      ))
+    }
 
 //    def processBatch(df: DataFrame, batchId: Long): Unit = {
 //      df
@@ -549,66 +568,120 @@ object KafkaReaderApp2 {
 //            Seq(("a",new Timestamp(1),new Timestamp(2),0.0,"F",0)).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
 //          ).coalesce(spliceKafkaPartitions.toInt)
 
-          val insertData = outState.toSeq.map((kv) => {
-            val k = kv._1
-            val v = kv._2
-            val twa: java.lang.Double = if( v._2.isNaN ) { null } else { v._2 }
-            Row(k._1, k._2, v._1, twa, v._3, v._4)
-            //          }).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
-          })
-
-          val batchDF = spark.createDataFrame(
-            spark.sparkContext.parallelize(insertData),
-            StructType(Seq(
-              StructField("FULL_TAG_NAME", StringType),
-              StructField("START_TS", TimestampType),
-              StructField("END_TS", TimestampType),
-              StructField("TIME_WEIGHTED_VALUE", DoubleType),
-              StructField("VALUE_STATE", StringType),
-              StructField("QUALITY", IntegerType)
-            ))
-          ).coalesce(spliceKafkaPartitions.toInt)
-
-          batchDF.persist
-          batchDF.show(false)
-          //log.info(s"Batch size: ${batchDF.count}")
-          //batchDF.distinct.orderBy("value").show(false)
-          
-//          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
-          ingester.ingest(batchDF)
-          
-          var count = 0
-          var ldInfo = loadedQueue.peek
-          while( ldInfo != null && count < 100 ) {
-            val topic = ldInfo._2.split("::")(0)
-            val ts = ldInfo._1
-            if(insertedQueue.contains(topic)) {
-              var sent = false
-              while(!sent) {  // todo add counter to prevent inf loop
-                var insInfo = insertedQueue.poll
-                if (topic.equals(insInfo.split("::")(0))) {
-                  //println(s"Publishing ${ts}")
-                  kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
-                  val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
-                  val tsStr = tsFormatter.format(ts).toString
-                  kafkaProducer.send(new ProducerRecord(
-                    resampledEventTopic,
-                    s"$eventStart${tsStr}$eventEnd"
-                  ))
-                  log.info(s"Published $tsStr after inserting $topic")
-                  sent = true
-                  loadedQueue.poll
-//                  minutesInProcess -= ts
-//                  outState = outState.filter((kv) => kv._1._2.after(ts))
+          if (jdbcMode) {
+            try {
+              var count = 0
+              for( (k,v) <- outState) {  //((kv) => {
+                val twa: java.lang.Double = if (v._2.isNaN) {
+                  null
+                } else {
+                  v._2
+                }
+                insert.get.setString(1, k._1)
+                insert.get.setTimestamp(2, k._2)
+                insert.get.setTimestamp(3, v._1)
+                insert.get.setDouble(4, twa)
+                insert.get.setString(5, v._3)
+                insert.get.setInt(6, v._4)
+                insert.get.addBatch()
+                count += 1
+                if (count == 1000) {
+                  count = 0
+                  insert.get.executeBatch
+                  insert.get.clearBatch()
                 }
               }
-            } else {
-              log.info(s"$topic not in insertedQueue: $insertedQueue")
+              if (count > 0) {
+                insert.get.executeBatch()
+                insert.get.clearBatch()
+              }
+              conn.get.commit()
+            } catch {
+              case sqlExp: SQLException => {
+                import java.sql.BatchUpdateException
+                val exp = if (sqlExp.isInstanceOf[BatchUpdateException]) { sqlExp.getNextException } else { sqlExp }
+                log.error(s"Problem saving data to DB for batch $batchId.\n$exp")
+              }
             }
-            //ldMap += ( topic -> ts )
-            //println(s"Loaded $topic $ts $ldMap")
-            ldInfo = loadedQueue.peek
-            count += 1
+            completedMinutes.toSeq.sortWith((t1,t2) => t1.before(t2)).foreach(m => {
+              kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
+              val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+              val tsStr = tsFormatter.format(m).toString
+              kafkaProducer.send(new ProducerRecord(
+                resampledEventTopic,
+                s"$eventStart${tsStr}$eventEnd"
+              ))
+              kafkaProducer.flush
+              kafkaProducer.close
+              log.info(s"Published $tsStr after inserting batch $batchId")
+            })
+          }
+          else {
+            val insertData = outState.toSeq.map((kv) => {
+              val k = kv._1
+              val v = kv._2
+              val twa: java.lang.Double = if( v._2.isNaN ) { null } else { v._2 }
+              Row(k._1, k._2, v._1, twa, v._3, v._4)
+              //          }).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
+            })
+
+            val batchDF = spark.createDataFrame(
+              spark.sparkContext.parallelize(insertData),
+              StructType(Seq(
+                StructField("FULL_TAG_NAME", StringType),
+                StructField("START_TS", TimestampType),
+                StructField("END_TS", TimestampType),
+                StructField("TIME_WEIGHTED_VALUE", DoubleType),
+                StructField("VALUE_STATE", StringType),
+                StructField("QUALITY", IntegerType)
+              ))
+            ).coalesce(spliceKafkaPartitions.toInt)
+
+            batchDF.persist
+            batchDF.show(false)
+            //log.info(s"Batch size: ${batchDF.count}")
+            //batchDF.distinct.orderBy("value").show(false)
+
+  //          ingester.ingest(batchDF.select(col("window") cast "string", col("FULLTAGNAME"), col("count")))
+            ingester.get.ingest(batchDF)
+
+            var count = 0
+            var ldInfo = loadedQueue.peek
+            while( ldInfo != null && count < 100 ) {
+              val topic = ldInfo._2.split("::")(0)
+              val ts = ldInfo._1
+              if(insertedQueue.contains(topic)) {
+                var sent = false
+                while(!sent) {  // todo add counter to prevent inf loop
+                  var insInfo = insertedQueue.poll
+                  if (topic.equals(insInfo.split("::")(0))) {
+                    //println(s"Publishing ${ts}")
+                    kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
+                    val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+                    val tsStr = tsFormatter.format(ts).toString
+                    kafkaProducer.send(new ProducerRecord(
+                      resampledEventTopic,
+                      s"$eventStart${tsStr}$eventEnd"
+                    ))
+                    kafkaProducer.flush
+                    kafkaProducer.close
+                    log.info(s"Published $tsStr after inserting $topic")
+                    sent = true
+                    loadedQueue.poll
+  //                  minutesInProcess -= ts
+  //                  outState = outState.filter((kv) => kv._1._2.after(ts))
+                  }
+                }
+              } else {
+                log.info(s"$topic not in insertedQueue: $insertedQueue")
+              }
+              //ldMap += ( topic -> ts )
+              //println(s"Loaded $topic $ts $ldMap")
+              ldInfo = loadedQueue.peek
+              count += 1
+            }
+
+            batchDF.unpersist
           }
           
 //          var insInfo = insertedQueue.poll
@@ -656,7 +729,7 @@ object KafkaReaderApp2 {
 //          }
           
 //          processBatch(batchDF, batchId)
-          batchDF.unpersist
+//          batchDF.unpersist
 
 //          println(s"${java.time.Instant.now} transferred batch having ${batchDF.count}")  // todo log count as trace or diagnostic
           log.info(s"transferred batch")
@@ -673,7 +746,16 @@ object KafkaReaderApp2 {
     strQuery.awaitTermination()
     strQuery.stop()
     spark.stop()
-    ingester.stop()
+    if(jdbcMode) {
+      try {
+        insert.get.close()
+        conn.get.close()
+      } catch {
+        case sqlExp: SQLException => log.error(s"Problem closing JDBC connection.\n$sqlExp")
+      }
+    } else {
+      ingester.get.stop()
+    }
 //    processing.compareAndSet(true, false)
   }
 }
