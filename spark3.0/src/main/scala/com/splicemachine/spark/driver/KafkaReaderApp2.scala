@@ -454,19 +454,38 @@ object KafkaReaderApp2 {
     var insert: Option[PreparedStatement] = None
     var ingester: Option[SLIIngester] = None
     
-    if(jdbcMode) {
-      try {
-        conn = Some(DriverManager.getConnection(spliceUrl))
-        conn.get.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE)
-        conn.get.setAutoCommit(false)
-        val upsertStr = if(upsert) { " --splice-properties insertMode=UPSERT\n" } else {""}
-        insert = Some(conn.get.prepareStatement("INSERT INTO " + spliceTable + upsertStr + " VALUES (?, ?, ?, ?, ?, ?)"))
-      } catch {
-        case sqlExp: SQLException => {
-          log.error(s"Problem setting up JDBC connection and prepared statement.\n$sqlExp")
-          System.exit(1)
+    def setupJDBC(): Unit = {
+      insert.foreach(ins => try{ ins.close } catch{case _ : Throwable => ;} )
+      conn.foreach(con => try{ con.close } catch{case _ : Throwable => ;} )
+      var connected = false
+      var attempts = 0
+      do {
+        try {
+          conn = Some(DriverManager.getConnection(spliceUrl))
+          conn.get.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE)
+          conn.get.setAutoCommit(false)
+          val upsertStr = if (upsert) {
+            " --splice-properties insertMode=UPSERT\n"
+          } else {
+            ""
+          }
+          insert = Some(conn.get.prepareStatement("INSERT INTO " + spliceTable + upsertStr + " VALUES (?, ?, ?, ?, ?, ?)"))
+          connected = true
+        } catch {
+          case sqlExp: SQLException => {
+            if( attempts % 60 == 0) {
+              log.error(s"Problem setting up JDBC connection and prepared statement.\n$sqlExp")
+              log.warn(s"Retrying JDBC setup")
+            }
+            Thread.sleep(1000)
+          }
         }
-      }
+        attempts += 1
+      } while(!connected)
+    }
+    
+    if(jdbcMode) {
+      setupJDBC
     } else {
       log.info("Create SLIIngester")
       ingester = Some(new SLIIngester(
@@ -569,40 +588,65 @@ object KafkaReaderApp2 {
 //          ).coalesce(spliceKafkaPartitions.toInt)
 
           if (jdbcMode) {
-            try {
-              var count = 0
-              for( (k,v) <- outState) {  //((kv) => {
-                val twa: java.lang.Double = if (v._2.isNaN) {
-                  null
-                } else {
-                  v._2
+            var retry = false
+            do {
+              try {
+                retry = false
+                var count = 0
+                for ((k, v) <- outState) { //((kv) => {
+                  val twa: java.lang.Double = if (v._2.isNaN) {
+                    null
+                  } else {
+                    v._2
+                  }
+                  insert.get.setString(1, k._1)
+                  insert.get.setTimestamp(2, k._2)
+                  insert.get.setTimestamp(3, v._1)
+                  insert.get.setDouble(4, twa)
+                  insert.get.setString(5, v._3)
+                  insert.get.setInt(6, v._4)
+                  insert.get.addBatch()
+                  count += 1
+                  if (count == 1000) {
+                    count = 0
+                    insert.get.executeBatch
+                    insert.get.clearBatch()
+                  }
                 }
-                insert.get.setString(1, k._1)
-                insert.get.setTimestamp(2, k._2)
-                insert.get.setTimestamp(3, v._1)
-                insert.get.setDouble(4, twa)
-                insert.get.setString(5, v._3)
-                insert.get.setInt(6, v._4)
-                insert.get.addBatch()
-                count += 1
-                if (count == 1000) {
-                  count = 0
-                  insert.get.executeBatch
+                if (count > 0) {
+                  insert.get.executeBatch()
                   insert.get.clearBatch()
                 }
+                conn.get.commit()
+              } catch {
+                case ntc: java.sql.SQLNonTransientConnectionException => {
+                  log.error(s"Problem saving data to DB for batch $batchId.~\n$ntc")
+                  retry = true
+                }
+                case sqlExp: SQLException => {
+                  val exp = if (sqlExp.isInstanceOf[java.sql.BatchUpdateException]) { sqlExp.getNextException } else { sqlExp }
+                  log.error(s"Problem saving data to DB for batch $batchId.-\n$exp")
+                  if(
+                    exp.toString.contains("RegionServerStoppedException")
+                    || exp.toString.contains("RegionServerAbortedException")
+                    || exp.toString.contains("Meta region is in state CLOSING")
+                    || exp.toString.contains("Connection timed out")
+                    || exp.toString.contains("connection has been terminated")
+                    || exp.toString.contains("Connection reset")
+                    || exp.toString.contains("Unable to fetch new timestamp")
+                    || exp.toString.contains("timestamp source has been closed")
+                    || exp.toString.contains("java.sql.SQLNonTransientConnectionException")
+                  ) {
+                    retry = true
+                  }
+                }
               }
-              if (count > 0) {
-                insert.get.executeBatch()
-                insert.get.clearBatch()
+              if(retry) {
+                log.warn(s"Retrying DB call")
+                Thread.sleep(1000)
+                setupJDBC
               }
-              conn.get.commit()
-            } catch {
-              case sqlExp: SQLException => {
-                import java.sql.BatchUpdateException
-                val exp = if (sqlExp.isInstanceOf[BatchUpdateException]) { sqlExp.getNextException } else { sqlExp }
-                log.error(s"Problem saving data to DB for batch $batchId.\n$exp")
-              }
-            }
+            } while(retry)
             completedMinutes.toSeq.sortWith((t1,t2) => t1.before(t2)).foreach(m => {
               kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
               val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
