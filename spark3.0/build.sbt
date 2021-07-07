@@ -1,6 +1,6 @@
 name := "splice-machine-spark-connector"
 
-val spliceVersion = "3.2.0.2001-SNAPSHOT"
+val spliceVersion = "3.1.0.2016"
 
 version := spliceVersion
 
@@ -38,17 +38,18 @@ kafkaVersion := s"2.2.1-${distro.value}"
 // java.lang.NoClassDefFoundError: com/splicemachine/access/HConfiguration
 // https://stackoverflow.com/a/46763742/1305344
 
-val excludedDeps = Seq(
+val excludedDepsNonSpark = Seq(
   ExclusionRule(organization = "org.xerial.snappy", name = "snappy-java"),
   ExclusionRule(organization = "tomcat", name = "jasper-compiler"),
-  // FIXME Somehow 2.2.0 is pulled down
-  ExclusionRule(organization = "org.apache.spark"),
   // Added later separately
   ExclusionRule(organization = "com.splicemachine", name = "scala_util"),
   ExclusionRule(organization = "javax.ws.rs", name = "javax.ws.rs-api"),
   ExclusionRule(organization = "org.apache.kafka", name = "kafka_2.11"),
   ExclusionRule(organization = "org.scala-lang.modules", name = "scala-parser-combinators_2.11")
 )
+
+val excludedDeps =
+  ExclusionRule(organization = "org.apache.spark") +: excludedDepsNonSpark
 
 libraryDependencies ++= Seq(
   "splice_spark2",
@@ -91,7 +92,13 @@ libraryDependencies += "org.apache.hbase" % "hbase-hadoop-compat" % hbaseVersion
 libraryDependencies += "org.apache.hbase" % "hbase-zookeeper" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.hbase" % "hbase-mapreduce" % hbaseVersion.value excludeAll (excludedDeps: _*)
 libraryDependencies += "org.apache.kafka" % "kafka_2.12" % kafkaVersion.value excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.spark" % "spark-sql-kafka-0-10_2.12" % sparkVersion.value excludeAll (excludedDepsNonSpark: _*)
 libraryDependencies += "org.scala-lang.modules" % "scala-parser-combinators_2.12" % "1.1.2" excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.activemq" % "activemq-all" % "5.12.0" excludeAll (excludedDeps: _*)
+libraryDependencies += "com.rabbitmq.jms" % "rabbitmq-jms" % "1.11.0" excludeAll (excludedDeps: _*)
+libraryDependencies += "io.confluent" % "kafka-jms-client" % "5.1.0" excludeAll (excludedDeps: _*)
+libraryDependencies += "org.apache.geronimo.specs" % "geronimo-jms_1.1_spec" % "1.1" excludeAll (excludedDeps: _*)
+libraryDependencies += "com.ibm.mq" % "com.ibm.mq.allclient" % "9.2.2.0" excludeAll (excludedDeps: _*)
 
 // For development only / local Splice SNAPSHOTs
 resolvers += Resolver.mavenLocal
@@ -100,6 +107,8 @@ resolvers +=
     .withAllowInsecureProtocol(true)
 resolvers +=
   "cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
+resolvers +=
+  "Confluent Repository" at "https://packages.confluent.io/maven/"
 
 // com.fasterxml.jackson.databind.JsonMappingException: Incompatible Jackson version: 2.9.2
 libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.10.0" force() excludeAll (excludedDeps: _*)
