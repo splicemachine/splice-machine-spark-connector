@@ -48,10 +48,8 @@ val excludedDepsNonSpark = Seq(
   ExclusionRule(organization = "org.scala-lang.modules", name = "scala-parser-combinators_2.11")
 )
 
-val excludedDeps = excludedDepsNonSpark ++ Seq(
-  // FIXME Somehow 2.2.0 is pulled down
-  ExclusionRule(organization = "org.apache.spark"),
-)
+val excludedDeps =
+  ExclusionRule(organization = "org.apache.spark") +: excludedDepsNonSpark
 
 libraryDependencies ++= Seq(
   "splice_spark2",
