@@ -530,7 +530,7 @@ object KafkaReaderApp2 {
     val strQuery = values
       .writeStream
 //      .outputMode("append")
-      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$spliceTable-${java.util.UUID.randomUUID()}")
+      .option("checkpointLocation",s"${chkpntRoot}checkpointLocation-$spliceTable")
 //      .trigger(Trigger.ProcessingTime(s"$windowSize $windowSizeUnits"))
       .foreachBatch {
         (df: DataFrame, batchId: Long) => try {
