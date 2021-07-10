@@ -548,32 +548,19 @@ object KafkaReaderApp2 {
           
           val activeMinutes = dfData.map(r => r.getAs[Timestamp]("START_TS")).distinct
           
-          val completedMinutes = minutesInProcess.filter(m => ! activeMinutes.contains(m))
-          
-          completedMinutes.foreach(m => {
-            outState = outState.filter((kv) => kv._1._2.after(m))
-            minutesInProcess -= m
-          })
-          
           //val doubleNull: Double = Double.NaN
-          activeMinutes.foreach(ts => {
-            //val ts = r.getAs[Timestamp]("START_TS")
-            if( ! minutesInProcess.contains(ts) ) {
-              val end_ts = new Timestamp(ts.toInstant.plusSeconds(60).toEpochMilli)
-              val prev_ts = new Timestamp(ts.toInstant.minusSeconds(60).toEpochMilli)
-              lastVals.foreach(tagVal => {
-                val tag = tagVal._1
-                val v = tagVal._2
-                //outState += ((tag,ts) -> (end_ts,doubleNull,"F",0))
-                outState += (tag,ts) -> (if( outState.contains((tag,prev_ts)) ) {
-                  val prevVal = outState((tag,prev_ts))
-                  (end_ts, prevVal._2, "F", prevVal._4)
-                } else {
-                  (end_ts, v._1, "F", v._3)
-                })
+          activeMinutes.filterNot( minutesInProcess.contains(_) ).foreach(ts => {
+            val end_ts = new Timestamp(ts.toInstant.plusSeconds(60).toEpochMilli)
+            lastVals.foreach(tagVal => {
+              val tag = tagVal._1
+              outState += (tag,ts) -> (if( outState.exists(_._1._1.equals(tag)) ) {
+                val prevState = outState.filterKeys(_._1.equals(tag)).reduce((kv1, kv2) => if (kv1._1._2.after(kv2._1._2)) kv1 else kv2)
+                (end_ts, prevState._2._2, "F", prevState._2._4)
+              } else {
+                (end_ts, tagVal._2._1, "F", tagVal._2._3)
               })
-              minutesInProcess += ts
-            }
+            })
+            minutesInProcess += ts
           })
 
           dfData.foreach(r => {
@@ -582,7 +569,14 @@ object KafkaReaderApp2 {
               r.getAs[Int]("QUALITY")
             )
           })
-          
+
+          val completedMinutes = minutesInProcess.filter(m => ! activeMinutes.contains(m))
+
+          completedMinutes.foreach(m => {
+            outState = outState.filter((kv) => kv._1._2.after(m))
+            minutesInProcess -= m
+          })
+
 //          val batchDF = df.union(
 //            Seq(("a",new Timestamp(1),new Timestamp(2),0.0,"F",0)).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
 //          ).coalesce(spliceKafkaPartitions.toInt)
