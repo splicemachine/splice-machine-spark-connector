@@ -4,7 +4,6 @@ import java.util.Properties
 import java.util.concurrent.{LinkedBlockingDeque, LinkedTransferQueue}
 import java.util.concurrent.atomic.AtomicBoolean
 import java.sql.{Connection, DriverManager, PreparedStatement, SQLException, Timestamp}
-
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.expressions._
@@ -22,6 +21,7 @@ import org.apache.log4j.Logger
 import com.spicemachine.spark.ingester.SLIIngester
 import com.spicemachine.spark.ingester.component.LoadedTimestampTracker
 import com.spicemachine.spark.ingester.component.InsertedTimestampTracker
+import com.splicemachine.spark.util.HdfsConfigurationUtil
 
 case class InputData(fullTagName: String, tagName: String, time: Timestamp, value: String, quality: String)
 case class DeltaData(endTime: Timestamp, delta: Long, value: String, quality: String, valueState: String)
@@ -44,19 +44,25 @@ object KafkaReaderApp2 {
     val startingOffsets = args.slice(10,11).headOption.getOrElse("latest")
     val checkpointLocationRootDir = args.slice(11,12).headOption.getOrElse("/tmp")
     val upsert = args.slice(12,13).headOption.getOrElse("false").toBoolean
-    val conserveTopics = args.slice(13,14).headOption.getOrElse("true").toBoolean
-    val jdbcMode = args.slice(14,15).headOption.getOrElse("true").toBoolean
-    val groupId = args.slice(15,16).headOption.getOrElse("")
-    val clientId = args.slice(16,17).headOption.getOrElse("")
-    val eventFormat = args.slice(17,18).headOption.getOrElse("flat")
-    val dataTransformation = args.slice(18,19).headOption.getOrElse("false").toBoolean
-    val tagFilename = args.slice(19,20).headOption.getOrElse("")
-    val useFlowMarkers = args.slice(20,21).headOption.getOrElse("false").toBoolean
-    val maxPollRecs = args.slice(21,22).headOption
+    val rpcs = args.slice(13,14).headOption
+    val fsName = args.slice(14,15).headOption.getOrElse("hdfs")
+    val namenodes = args.slice(14,15).headOption.getOrElse("nn0;nn1")
+    val conserveTopics = args.slice(16,17).headOption.getOrElse("true").toBoolean
+    val jdbcMode = args.slice(17,18).headOption.getOrElse("true").toBoolean
+    val groupId = args.slice(18,19).headOption.getOrElse("")
+    val clientId = args.slice(19,20).headOption.getOrElse("")
+    val eventFormat = args.slice(20,21).headOption.getOrElse("flat")
+    val dataTransformation = args.slice(21,22).headOption.getOrElse("false").toBoolean
+    val tagFilename = args.slice(22,23).headOption.getOrElse("")
+    val useFlowMarkers = args.slice(23,24).headOption.getOrElse("false").toBoolean
+    val maxPollRecs = args.slice(24,25).headOption
 
     val log = Logger.getLogger(getClass.getName)
 
     val spark = SparkSession.builder.appName(appName).getOrCreate()
+    if (rpcs.isDefined)
+      HdfsConfigurationUtil.setHdfsConfig(spark.sparkContext.hadoopConfiguration, fsName, namenodes, rpcs.get)
+
     import spark.implicits._
 
     val spliceTsFormatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")
@@ -147,41 +153,14 @@ object KafkaReaderApp2 {
       lastVal
     }
 
-    def parseCheckpointLocation(pathValue: String): String = {
-      var validCheckPointLocation = "/tmp/"
-      val configuration = new org.apache.hadoop.conf.Configuration();
-      val pathValues = pathValue.split(";")
-      var found = false
-      var i = 0
-      while (!found && i < pathValues.size) {
-        val value = pathValues(i)
-        log.info(s"Checking NN $value")
-        i = i + 1
-        try {
-          val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(value), configuration);
-          if (hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(value)))) {
-            validCheckPointLocation = value
-            found = true
-            log.info(s"Found NN $value")
-          }
-        } catch {
-          case e: Throwable => {
-            log.warn(s"NN $value is not available: ${e.getMessage}")
-          }
-        }
-      }
-      if(!found) {
-        log.warn(s"Can't find a valid checkpoint location from input param: $pathValue")
-      }
-      if(!validCheckPointLocation.endsWith("/")) { validCheckPointLocation+"/" } else {validCheckPointLocation}
+    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+    val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(chkpntRoot), spark.sparkContext.hadoopConfiguration);
+    if (!hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(chkpntRoot)))) {
+      log.warn(s"Can't find a valid checkpoint location from input param: $chkpntRoot")
     }
 
-    val chkpntRoot = parseCheckpointLocation(checkpointLocationRootDir)
-
-//    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
-
     log.info(s"Checkpoint Location: $chkpntRoot")
-    
+
     // Recommended when using stateful stream queries, based on
     //  https://docs.databricks.com/spark/latest/structured-streaming/production.html#optimize-performance-of-stateful-streaming-queries
 //    spark.conf.set(
