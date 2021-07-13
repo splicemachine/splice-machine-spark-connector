@@ -46,13 +46,14 @@ object KafkaReaderApp2 {
     val upsert = args.slice(12,13).headOption.getOrElse("false").toBoolean
     val conserveTopics = args.slice(13,14).headOption.getOrElse("true").toBoolean
     val jdbcMode = args.slice(14,15).headOption.getOrElse("true").toBoolean
-    val groupId = args.slice(15,16).headOption.getOrElse("")
-    val clientId = args.slice(16,17).headOption.getOrElse("")
-    val eventFormat = args.slice(17,18).headOption.getOrElse("flat")
-    val dataTransformation = args.slice(18,19).headOption.getOrElse("false").toBoolean
-    val tagFilename = args.slice(19,20).headOption.getOrElse("")
-    val useFlowMarkers = args.slice(20,21).headOption.getOrElse("false").toBoolean
-    val maxPollRecs = args.slice(21,22).headOption
+    val lastValueRetrievalLimitHrs = args.slice(15,16).headOption.getOrElse("8")
+    val groupId = args.slice(16,17).headOption.getOrElse("")
+    val clientId = args.slice(17,18).headOption.getOrElse("")
+    val eventFormat = args.slice(18,19).headOption.getOrElse("flat")
+    val dataTransformation = args.slice(19,20).headOption.getOrElse("false").toBoolean
+    val tagFilename = args.slice(20,21).headOption.getOrElse("")
+    val useFlowMarkers = args.slice(21,22).headOption.getOrElse("false").toBoolean
+    val maxPollRecs = args.slice(22,23).headOption
 
     val log = Logger.getLogger(getClass.getName)
 
@@ -81,16 +82,16 @@ object KafkaReaderApp2 {
 ////        )
 ////        .groupByKey(input => input.fullTagName)
 
-      log.info("Getting previous values of tags")
+      log.info(s"Getting previous values of tags from the last $lastValueRetrievalLimitHrs hours")
 //TIME_WEIGHTED_VALUE, VALUE_STATE, QUALITY,
       val lastVal = collection.mutable.Map.empty[String,(Double,String,Int)]
-      splice.df("""select out_table.* from --splice-properties joinOrder=fixed
+      splice.df(s"""select out_table.* from --splice-properties joinOrder=fixed
                   |(
                   |   select full_tag_name, max(start_ts) as max_ts from (
                   |    select rs.full_tag_name, start_ts from --splice-properties joinOrder=fixed 
                   |       oci2.kep_tag_conversion taglist,
                   |       oci2.resampled_data_1m rs --splice-properties joinStrategy=nestedloop
-                  |    where start_ts > current_timestamp - 3 days
+                  |    where start_ts > current_timestamp - $lastValueRetrievalLimitHrs hours
                   |    and rs.full_tag_name = taglist.converted_full_tag_name
                   |  )
                   |  group by full_tag_name 
