@@ -42,13 +42,13 @@ object KafkaReaderApp2 {
     val numLoaders = args.slice(8,9).headOption.getOrElse("1").toInt
     val numInserters = args.slice(9,10).headOption.getOrElse("1").toInt
     val startingOffsets = args.slice(10,11).headOption.getOrElse("latest")
-    val checkpointLocationRootDir = args.slice(11,12).headOption.getOrElse("/tmp")
-    val upsert = args.slice(12,13).headOption.getOrElse("false").toBoolean
-    val rpcs = args.slice(13,14).headOption
-    val fsName = args.slice(14,15).headOption.getOrElse("hdfs")
-    val namenodes = args.slice(15,16).headOption.getOrElse("nn0;nn1")
-    val conserveTopics = args.slice(16,17).headOption.getOrElse("true").toBoolean
-    val jdbcMode = args.slice(17,18).headOption.getOrElse("true").toBoolean
+    val upsert = args.slice(11,12).headOption.getOrElse("false").toBoolean
+    val conserveTopics = args.slice(12,13).headOption.getOrElse("true").toBoolean
+    val jdbcMode = args.slice(13,14).headOption.getOrElse("true").toBoolean
+    val checkpointLocationRootDir = args.slice(14,15).headOption.getOrElse("/tmp")
+    val rpcs = args.slice(15,16).headOption
+    val fsName = args.slice(16,17).headOption.getOrElse("hdfs")
+    val namenodes = args.slice(17,18).headOption.getOrElse("nn0;nn1")
     val lastValueRetrievalLimitHrs = args.slice(18,19).headOption.getOrElse("8")
     val groupId = args.slice(19,20).headOption.getOrElse("")
     val clientId = args.slice(20,21).headOption.getOrElse("")
@@ -505,6 +505,7 @@ object KafkaReaderApp2 {
     //val ldMap = collection.mutable.Map.empty[String,Timestamp]
 
     var outState = collection.mutable.Map.empty[(String,Timestamp),(Timestamp,Double,String,Int)]
+    var lastCompletedMinuteState = collection.mutable.Map.empty[(String,Timestamp),(Timestamp,Double,String,Int)]
     val minutesInProcess = collection.mutable.Set.empty[Timestamp]
 
     val strQuery = values
@@ -527,35 +528,54 @@ object KafkaReaderApp2 {
 //          })
           
           val activeMinutes = dfData.map(r => r.getAs[Timestamp]("START_TS")).distinct
-          
+
+          val completedMinutes = minutesInProcess.filterNot( activeMinutes.contains(_) )
+
+          val gap = collection.mutable.Set.empty[Timestamp]
+          val lastCompletedMinute = if(completedMinutes.nonEmpty) {
+            val earliestActiveMinute = activeMinutes.reduce((t1,t2) => if(t1.before(t2)) t1 else t2 )
+            val latestCompletedMinute = completedMinutes.reduce((t1, t2) => if(t1.after(t2)) t1 else t2)
+
+            var nextMinute = new Timestamp(latestCompletedMinute.toInstant.plusSeconds(60).toEpochMilli)
+            while (nextMinute.before(earliestActiveMinute)) {
+              gap += nextMinute
+              nextMinute = new Timestamp(nextMinute.toInstant.plusSeconds(60).toEpochMilli)
+            }
+            
+            Some(latestCompletedMinute)
+          } else { None }
+
           //val doubleNull: Double = Double.NaN
-          activeMinutes.filterNot( minutesInProcess.contains(_) ).foreach(ts => {
+          (activeMinutes ++ gap).filterNot( minutesInProcess.contains(_) ).toSeq.sortWith((t1,t2) => t1.before(t2)).foreach(ts => {
             val end_ts = new Timestamp(ts.toInstant.plusSeconds(60).toEpochMilli)
             lastVals.foreach(tagVal => {
               val tag = tagVal._1
-              outState += (tag,ts) -> (if( outState.exists(_._1._1.equals(tag)) ) {
-                val prevState = outState.filterKeys(_._1.equals(tag)).reduce((kv1, kv2) => if (kv1._1._2.after(kv2._1._2)) kv1 else kv2)
+              outState += (tag,ts) -> (if( lastCompletedMinuteState.exists(_._1._1.equals(tag)) ) {
+                val prevState = lastCompletedMinuteState.filterKeys(_._1.equals(tag)).reduce((kv1, kv2) => if (kv1._1._2.after(kv2._1._2)) kv1 else kv2)
                 (end_ts, prevState._2._2, "F", prevState._2._4)
               } else {
                 (end_ts, tagVal._2._1, "F", tagVal._2._3)
               })
             })
-            minutesInProcess += ts
           })
 
-          dfData.foreach(r => {
+          activeMinutes.foreach(m => minutesInProcess += m)
+
+          dfData.filter( _.getAs[String]("VALUE_STATE").equals("A") ).foreach(r => {
             outState += (r.getAs[String]("FULL_TAG_NAME"), r.getAs[Timestamp]("START_TS")) -> (
               r.getAs[Timestamp]("END_TS"), r.getAs[Double]("TIME_WEIGHTED_VALUE"), r.getAs[String]("VALUE_STATE"),
               r.getAs[Int]("QUALITY")
             )
           })
+          
+          outState = if( lastCompletedMinute.isDefined ) {
+            lastCompletedMinuteState = outState.filter( (kv) => kv._1._2.equals(lastCompletedMinute.get) )
+            outState.filter( (kv) => kv._1._2.after(lastCompletedMinute.get) )
+          } else {
+            outState
+          }
 
-          val completedMinutes = minutesInProcess.filter(m => ! activeMinutes.contains(m))
-
-          completedMinutes.foreach(m => {
-            outState = outState.filter((kv) => kv._1._2.after(m))
-            minutesInProcess -= m
-          })
+          completedMinutes.foreach(m => minutesInProcess -= m)
 
 //          val batchDF = df.union(
 //            Seq(("a",new Timestamp(1),new Timestamp(2),0.0,"F",0)).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
@@ -621,7 +641,8 @@ object KafkaReaderApp2 {
                 setupJDBC
               }
             } while(retry)
-            completedMinutes.toSeq.sortWith((t1,t2) => t1.before(t2)).foreach(m => {
+            
+            (completedMinutes ++ gap).toSeq.sortWith((t1,t2) => t1.before(t2)).foreach(m => {
               kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
               val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
               val tsStr = tsFormatter.format(m).toString
