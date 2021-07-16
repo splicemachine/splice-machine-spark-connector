@@ -66,14 +66,19 @@ object KafkaReaderApp2 {
 
     import spark.implicits._
 
-    val spliceTsFormatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")
+    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
+    val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(chkpntRoot), spark.sparkContext.hadoopConfiguration);
+    if (!hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(chkpntRoot)))) {
+      log.warn(s"Can't find a valid checkpoint location from input param: $chkpntRoot")
+    }
 
-    val lastVals = {
-      val splice = new SplicemachineContext(Map(
-        "url" -> spliceUrl,
-        "KAFKA_SERVERS" -> spliceKafkaServers,
-        "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions
-      ))
+    log.info(s"Checkpoint Location: $chkpntRoot")
+
+    //val spliceTsFormatter = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")
+
+    val tagReadingsTimeoutThreshold = 30
+    
+    val (lastVals, tagTimeouts) = {
 //      val tagLookup = splice.df("select * from OCI.TAGLOOKUPWITHIDENTITY").select("FULLTAGNAME", "TAG_TIMEOUT_SECONDS")
       
       // {"TAG": "OCIB.Kep.VYI-4164.PV", "SERVERTIME": "2021-06-25 18:29:47.961302", 
@@ -81,15 +86,14 @@ object KafkaReaderApp2 {
       //
       // InputData(fullTagName: String, tagName: String, time: Timestamp, value: String, quality: String)
 
-//      val allTags = splice.df("select CONVERTED_FULL_TAG_NAME from OCI2.KEP_TAG_CONVERSION where CONVERTED_FULL_TAG_NAME IS NOT NULL")
-//        .distinct.map(_.getAs[String]("CONVERTED_FULL_TAG_NAME")).collect
-////        .map(r => new InputData( r.getAs[String]("CONVERTED_FULL_TAG_NAME"), "DUMMY",
-////          new Timestamp(System.currentTimeMillis), "0.0", "0" )
-////        )
-////        .groupByKey(input => input.fullTagName)
+      val splice = new SplicemachineContext(Map(
+        "url" -> spliceUrl,
+        "KAFKA_SERVERS" -> spliceKafkaServers,
+        "KAFKA_TOPIC_PARTITIONS" -> spliceKafkaPartitions
+      ))
 
       log.info(s"Getting previous values of tags from the last $lastValueRetrievalLimitHrs hours")
-//TIME_WEIGHTED_VALUE, VALUE_STATE, QUALITY,
+
       val lastVal = collection.mutable.Map.empty[String,(Double,String,Int)]
       splice.df(s"""select out_table.* from --splice-properties joinOrder=fixed
                   |(
@@ -114,53 +118,18 @@ object KafkaReaderApp2 {
               lastVal += r.getAs[String]("FULL_TAG_NAME") -> (r.getAs[Double]("TIME_WEIGHTED_VALUE"), r.getAs[String]("VALUE_STATE"), r.getAs[Int]("QUALITY"))
             }
           })
+
+      log.info(s"Getting tag timeouts")
+
+      val tagTimeout = collection.mutable.Map.empty[String,(Long,Timestamp)]
+      val now = Timestamp.from(java.time.Instant.now)
+      splice.df(s"""SELECT FULLTAGNAME, TIME_BETWEEN_READINGS * $tagReadingsTimeoutThreshold as TIMEOUT
+                   | FROM OCI.TAG_FREQUENCY_CALCULATED""".stripMargin)
+        .collect
+        .foreach(r => tagTimeout += r.getAs[String]("FULLTAGNAME") -> (r.getAs[Long]("TIMEOUT"), now))
       
-//      splice.df("""select FULL_TAG_NAME, max(start_ts) from oci2.resampled_data_1m rs, oci2.kep_tag_conversion taglist
-//           where start_ts > current_timestamp - 3 days
-//           and rs.full_tag_name = taglist.converted_full_tag_name
-//           and rs.quality is not null
-//           group by FULL_TAG_NAME""")
-//        .collect
-//        .foreach(tagts => {
-//          val v = splice.df(
-//            s"""select FULL_TAG_NAME, TIME_WEIGHTED_VALUE, VALUE_STATE, QUALITY from OCI2.RESAMPLED_DATA_1M
-//               | where FULL_TAG_NAME='${tagts.getString(0)}'
-//               | and START_TS='${spliceTsFormatter.format(tagts.getTimestamp(1)).toString}'
-//               |""".stripMargin
-//          ).map(r => (r.getString(0), r.getDouble(1), r.getString(2), r.getInt(3))).reduce((r1, r2) => r1)
-//          lastVal += v._1 -> (v._2, v._3, v._4)
-//        })
-        
-//        .map(r => (r.getString(0), r.getDouble(1), r.getString(2), r.getInt(3)))
-//        .collect
-//        .foreach(d => lastVal += d._1 -> (d._2, d._3, d._4))
-
-//      allTags.foreach(tag => {
-//        val maxts = splice.df(
-//          s"""select max(start_ts) from OCI2.RESAMPLED_DATA_1M
-//             | where start_ts > current_timestamp - 3 days
-//             | and FULL_TAG_NAME = '$tag'
-//             |""".stripMargin).collect
-//        if( ! maxts(0).isNullAt(0) ) {
-//          val df = splice.df(
-//            s"""select FULL_TAG_NAME, TIME_WEIGHTED_VALUE, VALUE_STATE, QUALITY from OCI2.RESAMPLED_DATA_1M
-//               | where FULL_TAG_NAME='$tag'
-//               | and START_TS='${spliceTsFormatter.format(maxts(0).getTimestamp(0)).toString}'
-//               |""".stripMargin)
-//          val v = df.map(r => (r.getString(0), r.getDouble(1), r.getString(2), r.getInt(3))).reduce((r1, r2) => r1)
-//          lastVal += v._1 -> (v._2, v._3, v._4)
-//        }
-//      })
-      lastVal
+      (lastVal, tagTimeout)
     }
-
-    val chkpntRoot = if(!checkpointLocationRootDir.endsWith("/")) { checkpointLocationRootDir+"/" } else {checkpointLocationRootDir}
-    val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(chkpntRoot), spark.sparkContext.hadoopConfiguration);
-    if (!hdfs.exists(new org.apache.hadoop.fs.Path(new java.net.URI(chkpntRoot)))) {
-      log.warn(s"Can't find a valid checkpoint location from input param: $chkpntRoot")
-    }
-
-    log.info(s"Checkpoint Location: $chkpntRoot")
 
     // Recommended when using stateful stream queries, based on
     //  https://docs.databricks.com/spark/latest/structured-streaming/production.html#optimize-performance-of-stateful-streaming-queries
@@ -275,6 +244,7 @@ object KafkaReaderApp2 {
 //      .groupByKey(input => input.fullTagName)
       .flatMapGroupsWithState(OutputMode.Append, GroupStateTimeout.NoTimeout)((tag: String, valItr: Iterator[InputData], state: GroupState[Seq[InputData]]) => {
 //      .flatMapGroups((tag,valItr) => {
+        var valueState = "A"
         def sortByTime(r1: InputData, r2: InputData): Boolean = r1.time.before(r2.time)
         val newState = valItr.toSeq.filter(d => d.time != null).sortWith(sortByTime)
         //println(s"Count of $tag ${newState.size}")
@@ -299,6 +269,7 @@ object KafkaReaderApp2 {
             inScope
           } else {
             val lastRecBeforeWnStart = prevState(prevState.size - inScope.size - 1)
+            valueState = "F"
             new InputData(lastRecBeforeWnStart.fullTagName, lastRecBeforeWnStart.tagName, wnStart,
               lastRecBeforeWnStart.value, lastRecBeforeWnStart.quality) +: inScope
           }
@@ -325,7 +296,8 @@ object KafkaReaderApp2 {
             //println(cur)
             val curTime = cur.time.getTime
             while( curTime >= nextWndStart ) {
-              wnData += new DeltaData(new Timestamp(nextWndEnd), (nextWndStart-prevTime), prevValue, prevQuality, "F")
+              wnData += new DeltaData(new Timestamp(nextWndEnd), (nextWndStart-prevTime), prevValue, prevQuality, valueState)
+              valueState = "F"
               res += wnResults(tag, windowOf(prevTime), wnData.result)
               wnData.clear
               prevTime = nextWndStart
@@ -333,12 +305,13 @@ object KafkaReaderApp2 {
               nextWndEnd = nextWndCut._1
               nextWndStart = nextWndCut._2
             }
-            wnData += new DeltaData(new Timestamp(curTime), (curTime-prevTime), prevValue, prevQuality, "A")
+            wnData += new DeltaData(new Timestamp(curTime), (curTime-prevTime), prevValue, prevQuality, valueState)
+            valueState = "A"
             prevTime = curTime
             prevValue = cur.value
             prevQuality = cur.quality
           }
-          wnData += new DeltaData(new Timestamp(nextWndEnd), (nextWndStart-prevTime), prevValue, prevQuality, "F")
+          wnData += new DeltaData(new Timestamp(nextWndEnd), (nextWndStart - prevTime), prevValue, prevQuality, valueState)
           res += wnResults(tag, windowOf(prevTime), wnData.result)
           wnData.clear
           //state.update(wnData)
@@ -505,9 +478,22 @@ object KafkaReaderApp2 {
     //val ldMap = collection.mutable.Map.empty[String,Timestamp]
 
     var outState = collection.mutable.Map.empty[(String,Timestamp),(Timestamp,Double,String,Int)]
-    var lastCompletedMinuteState = collection.mutable.Map.empty[(String,Timestamp),(Timestamp,Double,String,Int)]
+    var lastCompletedMinuteState = collection.mutable.Map.empty[String,(Timestamp,Double,String,Int)]
     val minutesInProcess = collection.mutable.Set.empty[Timestamp]
 
+    def resetTagTimeout(tag: String, ts: Timestamp): Unit = if(tagTimeouts.contains(tag)) {
+      if( ts.after(tagTimeouts(tag)._2) ) {
+        tagTimeouts += tag -> (tagTimeouts(tag)._1, ts)
+      }
+    }
+    def tagHasTimedOut(tag: String, ts: Timestamp): Boolean = if(tagTimeouts.contains(tag)) {
+      val (timeoutDuration, lastGoodTime) = tagTimeouts(tag)
+      ts.after( Timestamp.from(lastGoodTime.toInstant.plusSeconds(timeoutDuration)) )
+    } else { false }
+
+    kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
+    val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
+    
     val strQuery = values
       .writeStream
 //      .outputMode("append")
@@ -518,14 +504,9 @@ object KafkaReaderApp2 {
           log.info(s"transfer next batch $batchId")
           
           val dfData = df.collect
-          
-//          val baselineState = outState.mapValues(v => {
-//            (v._1, v._2, "F", v._4)
-//          })
-//          
-//          baselineState.foreach(kv => {
-//            outState += kv
-//          })
+          //println( dfData.map(r => s"${r.getAs[String]("FULL_TAG_NAME")} " +
+          //  s"${r.getAs[Timestamp]("START_TS")} ${r.getAs[Timestamp]("END_TS")} ${r.getAs[Double]("TIME_WEIGHTED_VALUE")} ${r.getAs[String]("VALUE_STATE")} " +
+          //  s"${r.getAs[Int]("QUALITY")}").mkString(", ") )
           
           val activeMinutes = dfData.map(r => r.getAs[Timestamp]("START_TS")).distinct
 
@@ -550,9 +531,9 @@ object KafkaReaderApp2 {
             val end_ts = new Timestamp(ts.toInstant.plusSeconds(60).toEpochMilli)
             lastVals.foreach(tagVal => {
               val tag = tagVal._1
-              outState += (tag,ts) -> (if( lastCompletedMinuteState.exists(_._1._1.equals(tag)) ) {
-                val prevState = lastCompletedMinuteState.filterKeys(_._1.equals(tag)).reduce((kv1, kv2) => if (kv1._1._2.after(kv2._1._2)) kv1 else kv2)
-                (end_ts, prevState._2._2, "F", prevState._2._4)
+              outState += (tag,ts) -> (if( lastCompletedMinuteState.contains(tag) ) {
+                val prevState = lastCompletedMinuteState(tag)
+                (end_ts, prevState._2, "F", prevState._4)
               } else {
                 (end_ts, tagVal._2._1, "F", tagVal._2._3)
               })
@@ -561,25 +542,47 @@ object KafkaReaderApp2 {
 
           activeMinutes.foreach(m => minutesInProcess += m)
 
-          dfData.filter( _.getAs[String]("VALUE_STATE").equals("A") ).foreach(r => {
-            outState += (r.getAs[String]("FULL_TAG_NAME"), r.getAs[Timestamp]("START_TS")) -> (
-              r.getAs[Timestamp]("END_TS"), r.getAs[Double]("TIME_WEIGHTED_VALUE"), r.getAs[String]("VALUE_STATE"),
-              r.getAs[Int]("QUALITY")
-            )
-          })
+          val tagTimes = collection.mutable.Set.empty[(String,Timestamp)]
+          dfData.filter( _.getAs[String]("VALUE_STATE").equals("A") )
+            .sortWith((r1,r2) => r1.getAs[Timestamp]("START_TS").before(r2.getAs[Timestamp]("START_TS")) )
+            .foreach(r => {
+              val tag = r.getAs[String]("FULL_TAG_NAME")
+              val start_ts = r.getAs[Timestamp]("START_TS")
+              outState += (tag, start_ts) -> (
+                r.getAs[Timestamp]("END_TS"), r.getAs[Double]("TIME_WEIGHTED_VALUE"), r.getAs[String]("VALUE_STATE"),
+                r.getAs[Int]("QUALITY")
+              )
+              tagTimes += ((tag, start_ts))
+            })
+
+          val timeouts = collection.mutable.Map.empty[(String,Timestamp),(Timestamp,Double,String,Int)]
+          outState.filter(kv => kv._2._3.equals("F"))
+            .filterKeys(tagTs => tagHasTimedOut(tagTs._1, tagTs._2) )
+            .foreach(kv => timeouts += kv._1 -> (kv._2._1, kv._2._2, "T", kv._2._4))
+          outState ++= timeouts
+          
+          tagTimes.foreach(t => resetTagTimeout(t._1, t._2) )
           
           outState = if( lastCompletedMinute.isDefined ) {
-            lastCompletedMinuteState = outState.filter( (kv) => kv._1._2.equals(lastCompletedMinute.get) )
+            val lastCompletedState = outState.filter( (kv) => kv._1._2.equals(lastCompletedMinute.get) )
+            val lcmsEmpty = lastCompletedMinuteState.isEmpty
+            lastCompletedState.filter(kv => lcmsEmpty || kv._2._3.equals("A"))
+              .foreach(kv => lastCompletedMinuteState += kv._1._1 -> kv._2)
+            
             outState.filter( (kv) => kv._1._2.after(lastCompletedMinute.get) )
           } else {
             outState
           }
 
-          completedMinutes.foreach(m => minutesInProcess -= m)
+          if( lastCompletedMinuteState.nonEmpty ) {
+            outState.filter(kv => !kv._2._3.equals("A"))
+              .foreach( kv => {
+                val state = lastCompletedMinuteState.getOrElse(kv._1._1, kv._2)
+                outState += kv._1 -> (kv._2._1, state._2, kv._2._3, state._4)
+              })
+          }
 
-//          val batchDF = df.union(
-//            Seq(("a",new Timestamp(1),new Timestamp(2),0.0,"F",0)).toDF("FULL_TAG_NAME","START_TS","END_TS","TIME_WEIGHTED_VALUE","VALUE_STATE","QUALITY")
-//          ).coalesce(spliceKafkaPartitions.toInt)
+          completedMinutes.foreach(m => minutesInProcess -= m)
 
           if (jdbcMode) {
             var retry = false
@@ -643,17 +646,14 @@ object KafkaReaderApp2 {
             } while(retry)
             
             (completedMinutes ++ gap).toSeq.sortWith((t1,t2) => t1.before(t2)).foreach(m => {
-              kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
-              val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
               val tsStr = tsFormatter.format(m).toString
               kafkaProducer.send(new ProducerRecord(
                 resampledEventTopic,
-                s"$eventStart${tsStr}$eventEnd"
+                s"$eventStart$tsStr$eventEnd"
               ))
-              kafkaProducer.flush
-              kafkaProducer.close
               log.info(s"Published $tsStr after inserting batch $batchId")
             })
+            kafkaProducer.flush
           }
           else {
             val insertData = outState.toSeq.map((kv) => {
@@ -695,15 +695,12 @@ object KafkaReaderApp2 {
                   var insInfo = insertedQueue.poll
                   if (topic.equals(insInfo.split("::")(0))) {
                     //println(s"Publishing ${ts}")
-                    kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
-                    val kafkaProducer = new KafkaProducer[Integer, String](kafkaProducerProps)
                     val tsStr = tsFormatter.format(ts).toString
                     kafkaProducer.send(new ProducerRecord(
                       resampledEventTopic,
-                      s"$eventStart${tsStr}$eventEnd"
+                      s"$eventStart$tsStr$eventEnd"
                     ))
                     kafkaProducer.flush
-                    kafkaProducer.close
                     log.info(s"Published $tsStr after inserting $topic")
                     sent = true
                     loadedQueue.poll
@@ -775,7 +772,7 @@ object KafkaReaderApp2 {
         } catch {
           case e: Throwable =>
             log.error(s"KafkaReader Exception processing batch $batchId\n$e")
-//            e.printStackTrace
+            e.printStackTrace
         }
       }.start()
 
@@ -795,6 +792,7 @@ object KafkaReaderApp2 {
     } else {
       ingester.get.stop()
     }
+    kafkaProducer.close()
 //    processing.compareAndSet(true, false)
   }
 }
