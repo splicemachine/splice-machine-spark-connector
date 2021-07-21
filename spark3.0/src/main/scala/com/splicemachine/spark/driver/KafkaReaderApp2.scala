@@ -61,7 +61,7 @@ object KafkaReaderApp2 {
     val log = Logger.getLogger(getClass.getName)
 
     val spark = SparkSession.builder.appName(appName).getOrCreate()
-    if (rpcs.isDefined)
+    if (rpcs.isDefined && ! rpcs.get.isEmpty)
       HdfsConfigurationUtil.setHdfsConfig(spark.sparkContext.hadoopConfiguration, fsName, namenodes, rpcs.get)
 
     import spark.implicits._
@@ -95,6 +95,7 @@ object KafkaReaderApp2 {
       log.info(s"Getting previous values of tags from the last $lastValueRetrievalLimitHrs hours")
 
       val lastVal = collection.mutable.Map.empty[String,(Double,String,Int)]
+      val lastTs = collection.mutable.Map.empty[String,Timestamp]
       splice.df(s"""select out_table.* from --splice-properties joinOrder=fixed
                   |(
                   |   select full_tag_name, max(start_ts) as max_ts from (
@@ -116,17 +117,22 @@ object KafkaReaderApp2 {
               println(msg)
             } else {
               lastVal += r.getAs[String]("FULL_TAG_NAME") -> (r.getAs[Double]("TIME_WEIGHTED_VALUE"), r.getAs[String]("VALUE_STATE"), r.getAs[Int]("QUALITY"))
+              lastTs += r.getAs[String]("FULL_TAG_NAME") -> r.getAs[Timestamp]("START_TS")
             }
           })
 
       log.info(s"Getting tag timeouts")
 
-      val tagTimeout = collection.mutable.Map.empty[String,(Long,Timestamp)]
+      val tagTimeout = collection.mutable.Map.empty[String,(Long,Timestamp,Timestamp)]
       val now = Timestamp.from(java.time.Instant.now)
       splice.df(s"""SELECT FULLTAGNAME, TIME_BETWEEN_READINGS * $tagReadingsTimeoutThreshold as TIMEOUT
                    | FROM OCI.TAG_FREQUENCY_CALCULATED""".stripMargin)
         .collect
-        .foreach(r => tagTimeout += r.getAs[String]("FULLTAGNAME") -> (r.getAs[Long]("TIMEOUT"), now))
+        .foreach(r => {
+          val ts = lastTs.getOrElse(r.getAs[String]("FULLTAGNAME"), now)
+          tagTimeout += r.getAs[String]("FULLTAGNAME") -> (r.getAs[Long]("TIMEOUT"), ts, ts)
+        })
+      lastTs.clear
       
       (lastVal, tagTimeout)
     }
@@ -195,6 +201,7 @@ object KafkaReaderApp2 {
     val watermarkThreshold = 2 * windowSize
     val watermarkThresholdUnits = windowSizeUnits
     val watermarkThresholdMs = watermarkThreshold * 1000
+    val dayMs = 24*60*60*1000
 
 //    Input format:
 //    {"FULLTAGNAME":"OCIB.Kep.FFIC731.PV", "TAGNAME":"FFIC731.PV", "TIME":
@@ -246,7 +253,8 @@ object KafkaReaderApp2 {
 //      .flatMapGroups((tag,valItr) => {
         var valueState = "A"
         def sortByTime(r1: InputData, r2: InputData): Boolean = r1.time.before(r2.time)
-        val newState = valItr.toSeq.filter(d => d.time != null).sortWith(sortByTime)
+        val dayAgo = java.time.Instant.now.toEpochMilli - dayMs
+        val newState = valItr.toSeq.filter(d => d.time != null && d.time.getTime > dayAgo ).sortWith(sortByTime)
         //println(s"Count of $tag ${newState.size}")
         val itr = if(state.exists) {
           //println("State exists")
@@ -313,6 +321,11 @@ object KafkaReaderApp2 {
           }
           wnData += new DeltaData(new Timestamp(nextWndEnd), (nextWndStart - prevTime), prevValue, prevQuality, valueState)
           res += wnResults(tag, windowOf(prevTime), wnData.result)
+          wnData.clear
+          
+          val (futureWndStart, futureWndEnd) = windowOf(nextWndStart)
+          wnData += new DeltaData(futureWndEnd, windowMs, prevValue, prevQuality, "F")
+          res += wnResults(tag, (futureWndStart, futureWndEnd), wnData.result)
           wnData.clear
           //state.update(wnData)
         }
@@ -478,17 +491,20 @@ object KafkaReaderApp2 {
     //val ldMap = collection.mutable.Map.empty[String,Timestamp]
 
     var outState = collection.mutable.Map.empty[(String,Timestamp),(Timestamp,Double,String,Int)]
-    var lastCompletedMinuteState = collection.mutable.Map.empty[String,(Timestamp,Double,String,Int)]
     val minutesInProcess = collection.mutable.Set.empty[Timestamp]
 
     def resetTagTimeout(tag: String, ts: Timestamp): Unit = if(tagTimeouts.contains(tag)) {
-      if( ts.after(tagTimeouts(tag)._2) ) {
-        tagTimeouts += tag -> (tagTimeouts(tag)._1, ts)
+      if( ts.after(tagTimeouts(tag)._3) ) {
+        tagTimeouts += tag -> (tagTimeouts(tag)._1, tagTimeouts(tag)._3, ts)
       }
     }
+    
+    def withinDuration(ts1: Timestamp, ts2: Timestamp, duration: Long): Boolean =
+      ts1.after(ts2) && ts1.before( Timestamp.from(ts2.toInstant.plusSeconds(duration)) )
+    
     def tagHasTimedOut(tag: String, ts: Timestamp): Boolean = if(tagTimeouts.contains(tag)) {
-      val (timeoutDuration, lastGoodTime) = tagTimeouts(tag)
-      ts.after( Timestamp.from(lastGoodTime.toInstant.plusSeconds(timeoutDuration)) )
+      val (timeoutDuration, lastGoodTime1, lastGoodTime2) = tagTimeouts(tag)
+      ! withinDuration(ts, lastGoodTime1, timeoutDuration) && ! withinDuration(ts, lastGoodTime2, timeoutDuration)
     } else { false }
 
     kafkaProducerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "spark-producer-ssds-resampling-" + java.util.UUID.randomUUID())
@@ -512,6 +528,7 @@ object KafkaReaderApp2 {
 
           val completedMinutes = minutesInProcess.filterNot( activeMinutes.contains(_) )
 
+          // Fill gap of any missed minutes
           val gap = collection.mutable.Set.empty[Timestamp]
           val lastCompletedMinute = if(completedMinutes.nonEmpty) {
             val earliestActiveMinute = activeMinutes.reduce((t1,t2) => if(t1.before(t2)) t1 else t2 )
@@ -526,14 +543,15 @@ object KafkaReaderApp2 {
             Some(latestCompletedMinute)
           } else { None }
 
+          // Add records to outState for new minutes that weren't processed before
           //val doubleNull: Double = Double.NaN
           (activeMinutes ++ gap).filterNot( minutesInProcess.contains(_) ).toSeq.sortWith((t1,t2) => t1.before(t2)).foreach(ts => {
             val end_ts = new Timestamp(ts.toInstant.plusSeconds(60).toEpochMilli)
             lastVals.foreach(tagVal => {
               val tag = tagVal._1
-              outState += (tag,ts) -> (if( lastCompletedMinuteState.contains(tag) ) {
-                val prevState = lastCompletedMinuteState(tag)
-                (end_ts, prevState._2, "F", prevState._4)
+              outState += (tag,ts) -> (if( outState.exists(_._1._1.equals(tag)) ) {
+                val prevState = outState.filterKeys(_._1.equals(tag)).reduce((kv1, kv2) => if (kv1._1._2.after(kv2._1._2)) kv1 else kv2)
+                (end_ts, prevState._2._2, "F", prevState._2._4)
               } else {
                 (end_ts, tagVal._2._1, "F", tagVal._2._3)
               })
@@ -542,44 +560,35 @@ object KafkaReaderApp2 {
 
           activeMinutes.foreach(m => minutesInProcess += m)
 
-          val tagTimes = collection.mutable.Set.empty[(String,Timestamp)]
-          dfData.filter( _.getAs[String]("VALUE_STATE").equals("A") )
+          // Put records from dfData into outState
+          //val goodTagTimes = collection.mutable.Set.empty[(String,Timestamp)]
+          dfData
             .sortWith((r1,r2) => r1.getAs[Timestamp]("START_TS").before(r2.getAs[Timestamp]("START_TS")) )
             .foreach(r => {
               val tag = r.getAs[String]("FULL_TAG_NAME")
               val start_ts = r.getAs[Timestamp]("START_TS")
+              val valueState = r.getAs[String]("VALUE_STATE")
               outState += (tag, start_ts) -> (
-                r.getAs[Timestamp]("END_TS"), r.getAs[Double]("TIME_WEIGHTED_VALUE"), r.getAs[String]("VALUE_STATE"),
+                r.getAs[Timestamp]("END_TS"), r.getAs[Double]("TIME_WEIGHTED_VALUE"), valueState,
                 r.getAs[Int]("QUALITY")
               )
-              tagTimes += ((tag, start_ts))
+              if( valueState.equals("A") ) { resetTagTimeout(tag, start_ts) }
             })
 
+          // Determine timeouts
           val timeouts = collection.mutable.Map.empty[(String,Timestamp),(Timestamp,Double,String,Int)]
           outState.filter(kv => kv._2._3.equals("F"))
             .filterKeys(tagTs => tagHasTimedOut(tagTs._1, tagTs._2) )
             .foreach(kv => timeouts += kv._1 -> (kv._2._1, kv._2._2, "T", kv._2._4))
           outState ++= timeouts
-          
-          tagTimes.foreach(t => resetTagTimeout(t._1, t._2) )
+
+          //goodTagTimes.foreach(t => resetTagTimeout(t._1, t._2) )
           
           outState = if( lastCompletedMinute.isDefined ) {
-            val lastCompletedState = outState.filter( (kv) => kv._1._2.equals(lastCompletedMinute.get) )
-            val lcmsEmpty = lastCompletedMinuteState.isEmpty
-            lastCompletedState.filter(kv => lcmsEmpty || kv._2._3.equals("A"))
-              .foreach(kv => lastCompletedMinuteState += kv._1._1 -> kv._2)
-            
+            // Drop completed minutes from outState
             outState.filter( (kv) => kv._1._2.after(lastCompletedMinute.get) )
           } else {
             outState
-          }
-
-          if( lastCompletedMinuteState.nonEmpty ) {
-            outState.filter(kv => !kv._2._3.equals("A"))
-              .foreach( kv => {
-                val state = lastCompletedMinuteState.getOrElse(kv._1._1, kv._2)
-                outState += kv._1 -> (kv._2._1, state._2, kv._2._3, state._4)
-              })
           }
 
           completedMinutes.foreach(m => minutesInProcess -= m)
